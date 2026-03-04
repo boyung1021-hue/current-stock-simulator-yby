@@ -1,11 +1,12 @@
 "use client"
 
 import { useState } from "react"
-import { Search, TrendingUp, ChevronRight } from "lucide-react"
+import { Search, TrendingUp, ChevronRight, Lock } from "lucide-react"
 import { Sparkline } from "@/components/sparkline"
 import { StockDetailSheet } from "@/components/stock-detail-sheet"
 import { cn } from "@/lib/utils"
 import type { Stock, Holding } from "@/lib/stocks"
+import { searchKoreanStocks } from "@/lib/korean-stock-db"
 
 const MARKET_INDICES = [
   { name: "KOSPI", value: "2,614.30", change: "+18.42", changePct: "+0.71%", isUp: true },
@@ -63,6 +64,12 @@ export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell }: Discov
       const rankB = STOCK_RANKS[b.ticker]?.rank ?? 99
       return rankA - rankB
     })
+
+  // 게임에 없는 한국 주식 (로컬 DB 검색, 즉각 반응)
+  const gameTickers = new Set(allStocks.map((s) => s.ticker))
+  const extraResults = searchQuery.trim().length >= 1
+    ? searchKoreanStocks(searchQuery.trim(), 10).filter((r) => !gameTickers.has(r.ticker))
+    : []
 
   const selectedHolding = selectedStock
     ? holdings.find((h) => h.ticker === selectedStock.ticker)
@@ -236,6 +243,51 @@ export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell }: Discov
             )}
           </div>
         </div>
+
+        {/* ── 전체 종목 검색 결과 (게임 미지원 종목) ── */}
+        {searchQuery.trim().length >= 1 && extraResults.length > 0 && (
+          <div className="px-4 mb-4">
+            <div className="flex items-center gap-1.5 mb-3">
+              <Search className="w-4 h-4 text-muted-foreground" />
+              <h2 className="text-base font-bold text-foreground">전체 종목</h2>
+            </div>
+            <div className="bg-card rounded-2xl card-shadow overflow-hidden">
+              {extraResults.map((result, index) => (
+                <div
+                  key={result.ticker}
+                  className={cn(
+                    "px-4 py-3.5 flex items-center gap-3",
+                    index < extraResults.length - 1 && "border-b border-border"
+                  )}
+                >
+                  <div className="w-9 h-9 rounded-xl bg-secondary flex items-center justify-center flex-shrink-0">
+                    <span className="text-xs font-bold text-muted-foreground">
+                      {result.name.charAt(0)}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-foreground truncate">{result.name}</p>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <p className="text-xs text-muted-foreground">{result.ticker}</p>
+                      <span className={cn(
+                        "text-[9px] font-bold px-1 py-0.5 rounded",
+                        result.exchange === "KOSPI"
+                          ? "bg-blue-50 text-blue-600"
+                          : "bg-green-50 text-green-600"
+                      )}>
+                        {result.exchange}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 text-muted-foreground flex-shrink-0">
+                    <Lock className="w-3 h-3" />
+                    <span className="text-[10px]">게임 미지원</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* News / Market Digest */}
         {!searchQuery && (
