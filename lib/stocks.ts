@@ -185,12 +185,6 @@ export const YAHOO_TICKERS: Record<string, string> = {
   '051910': '051910.KS',  // LG화학
 }
 
-export const INITIAL_HOLDINGS: Holding[] = [
-  { ...ALL_STOCKS[0], shares: 15, avgPrice: 68200 },
-  { ...ALL_STOCKS[2], shares: 4, avgPrice: 175000 },
-  { ...ALL_STOCKS[3], shares: 3, avgPrice: 198000 },
-  { ...ALL_STOCKS[5], shares: 2, avgPrice: 358000 },
-  { ...ALL_STOCKS[4], shares: 10, avgPrice: 48500 },
-]
+export const INITIAL_HOLDINGS: Holding[] = []
 
-export const INITIAL_CASH = 5_000_000
+export const INITIAL_CASH = 1_000_000
