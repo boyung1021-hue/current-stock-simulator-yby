@@ -164,33 +164,33 @@ export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell, gameDate
         )}
 
         {/* Theme Sectors */}
-        {!searchQuery && (
-          <div className="px-4 mb-5">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-base font-bold text-foreground">테마 섹터</h2>
-              <button className="flex items-center gap-0.5 text-xs text-muted-foreground active:scale-95 transition-transform">
-                전체보기 <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-            <div className="grid grid-cols-3 gap-2.5">
-              {THEME_SECTORS.map((sector) => (
-                <button
-                  key={sector.name}
-                  className="bg-card rounded-2xl card-shadow p-3.5 text-left active:scale-[0.97] transition-transform"
-                  aria-label={`${sector.name} sector`}
-                >
-                  <div className={cn("inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-semibold mb-2", sector.color)}>
-                    {sector.name}
-                  </div>
-                  <p className="text-xs text-muted-foreground">{sector.count}개 종목</p>
-                  <p className={cn("text-sm font-bold mt-0.5", sector.isUp ? "stock-up" : "stock-down")}>
-                    {sector.change}
-                  </p>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        {/*{!searchQuery && (*/}
+        {/*  <div className="px-4 mb-5">*/}
+        {/*    <div className="flex items-center justify-between mb-3">*/}
+        {/*      <h2 className="text-base font-bold text-foreground">테마 섹터</h2>*/}
+        {/*      <button className="flex items-center gap-0.5 text-xs text-muted-foreground active:scale-95 transition-transform">*/}
+        {/*        전체보기 <ChevronRight className="w-3.5 h-3.5" />*/}
+        {/*      </button>*/}
+        {/*    </div>*/}
+        {/*    <div className="grid grid-cols-3 gap-2.5">*/}
+        {/*      {THEME_SECTORS.map((sector) => (*/}
+        {/*        <button*/}
+        {/*          key={sector.name}*/}
+        {/*          className="bg-card rounded-2xl card-shadow p-3.5 text-left active:scale-[0.97] transition-transform"*/}
+        {/*          aria-label={`${sector.name} sector`}*/}
+        {/*        >*/}
+        {/*          <div className={cn("inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-semibold mb-2", sector.color)}>*/}
+        {/*            {sector.name}*/}
+        {/*          </div>*/}
+        {/*          <p className="text-xs text-muted-foreground">{sector.count}개 종목</p>*/}
+        {/*          <p className={cn("text-sm font-bold mt-0.5", sector.isUp ? "stock-up" : "stock-down")}>*/}
+        {/*            {sector.change}*/}
+        {/*          </p>*/}
+        {/*        </button>*/}
+        {/*      ))}*/}
+        {/*    </div>*/}
+        {/*  </div>*/}
+        {/*)}*/}
 
         {/* Hot Stocks */}
         <div className="px-4 mb-4">
