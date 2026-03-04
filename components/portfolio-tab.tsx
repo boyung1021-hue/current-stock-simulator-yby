@@ -38,15 +38,16 @@ export function PortfolioTab({ holdings, cash, onBuy, onSell }: PortfolioTabProp
   const [hideBalance, setHideBalance] = useState(false)
   const [selectedStock, setSelectedStock] = useState<Holding | null>(null)
 
-  const totalValue = holdings.reduce((sum, h) => sum + h.price * h.shares, 0)
+  const stockValue = holdings.reduce((sum, h) => sum + h.price * h.shares, 0)
+  const totalValue = stockValue + cash
   const totalInvested = holdings.reduce((sum, h) => sum + h.avgPrice * h.shares, 0)
-  const totalGain = totalValue - totalInvested
+  const totalGain = stockValue - totalInvested
   const totalGainPct = totalInvested > 0 ? (totalGain / totalInvested) * 100 : 0
   const isTotalUp = totalGain >= 0
 
-  const todayGain = 283000
-  const todayGainPct = 2.21
-  const todayIsUp = true
+  const todayGain = holdings.reduce((sum, h) => sum + h.change * h.shares, 0)
+  const todayGainPct = stockValue > 0 ? (todayGain / (stockValue - todayGain)) * 100 : 0
+  const todayIsUp = todayGain >= 0
 
   const mask = (val: string) => (hideBalance ? "•••••" : val)
 
@@ -94,7 +95,7 @@ export function PortfolioTab({ holdings, cash, onBuy, onSell }: PortfolioTabProp
             </p>
 
             {/* Today's change */}
-            <div className="flex items-center gap-2 mb-4">
+            <div className={cn("flex items-center gap-2 mb-4", holdings.length === 0 && "invisible")}>
               <span className={cn("flex items-center gap-0.5 text-sm font-semibold", todayIsUp ? "stock-up" : "stock-down")}>
                 {todayIsUp
                   ? <TrendingUp className="w-3.5 h-3.5" strokeWidth={2.2} />
