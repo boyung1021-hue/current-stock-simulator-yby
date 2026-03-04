@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { YAHOO_TICKERS } from '@/lib/stocks'
+import { YAHOO_TICKERS, USD_STOCKS } from '@/lib/stocks'
 
 export type DayPrice = { date: string; close: number }
 type PriceMap = Map<string, DayPrice[]>
@@ -81,15 +81,26 @@ export function useHistoricalData() {
       const current = arr[idx]
       const prev = idx > 0 ? arr[idx - 1] : null
 
-      const price = current.close
-      const change = prev ? price - prev.close : 0
-      const changePct = prev && prev.close > 0 ? (change / prev.close) * 100 : 0
+      // USD 종목은 당일 USD/KRW 환율로 변환
+      let usdToKrw = 1
+      if (USD_STOCKS.has(ticker)) {
+        const krwArr = priceMap.get('KRW=X')
+        if (krwArr) {
+          const krwIdx = binarySearch(krwArr, targetStr)
+          if (krwIdx >= 0) usdToKrw = krwArr[krwIdx].close
+        }
+      }
+
+      const price = Math.round(current.close * usdToKrw)
+      const prevPrice = prev ? Math.round(prev.close * usdToKrw) : null
+      const change = prevPrice != null ? price - prevPrice : 0
+      const changePct = prevPrice && prevPrice > 0 ? (change / prevPrice) * 100 : 0
       const isUp = change >= 0
 
       // sparkData: last 10 trading days up to and including current
       const sparkData = arr
         .slice(Math.max(0, idx - 9), idx + 1)
-        .map((d) => d.close)
+        .map((d) => Math.round(d.close * usdToKrw))
 
       return { price, change, changePct, isUp, sparkData }
     },

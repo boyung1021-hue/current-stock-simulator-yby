@@ -28,16 +28,10 @@ const STOCK_RANKS: Record<string, { rank: number; volume: string }> = {
   "000660": { rank: 3, volume: "6.3M" },
   "035420": { rank: 4, volume: "4.1M" },
   "035720": { rank: 5, volume: "3.8M" },
+  "NVDA":   { rank: 6, volume: "42.1M" },
+  "051910": { rank: 7, volume: "2.1M" },
 }
 
-const THEME_SECTORS = [
-  { name: "반도체", label: "Semiconductor", count: 24, change: "+2.1%", isUp: true, color: "bg-blue-50 text-blue-600" },
-  { name: "2차전지", label: "Battery", count: 18, change: "+3.8%", isUp: true, color: "bg-green-50 text-green-600" },
-  { name: "바이오", label: "Bio/Health", count: 31, change: "-0.6%", isUp: false, color: "bg-rose-50 text-rose-500" },
-  { name: "AI/플랫폼", label: "AI & Platform", count: 15, change: "+1.4%", isUp: true, color: "bg-violet-50 text-violet-600" },
-  { name: "자동차", label: "Auto", count: 12, change: "-1.2%", isUp: false, color: "bg-orange-50 text-orange-500" },
-  { name: "금융", label: "Finance", count: 20, change: "+0.3%", isUp: true, color: "bg-cyan-50 text-cyan-600" },
-]
 
 const MARKET_TABS = ["전체", "상승", "하락", "거래량"]
 
