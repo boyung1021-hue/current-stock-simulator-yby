@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState, useEffect } from "react"
-import { Search, TrendingUp, Loader2 } from "lucide-react"
+import { Search, TrendingUp, Loader2, Zap } from "lucide-react"
 import { Sparkline } from "@/components/sparkline"
 import { StockDetailSheet } from "@/components/stock-detail-sheet"
 import { cn } from "@/lib/utils"
@@ -32,6 +32,14 @@ const STOCK_RANKS: Record<string, { rank: number; volume: string }> = {
   "051910": { rank: 7, volume: "2.1M" },
 }
 
+
+const LEVERAGE_STOCKS = [
+  { ticker: 'TQQQ', name: 'ProShares UltraPro QQQ' },
+  { ticker: 'SOXL', name: 'Direxion Daily Semi Bull 3X' },
+  { ticker: 'SQQQ', name: 'ProShares UltraPro Short QQQ' },
+]
+
+type ExtraPrice = { price: number; change: number; changePct: number; isUp: boolean } | null
 
 const MARKET_TABS = ["전체", "상승", "하락", "거래량"]
 
@@ -123,9 +131,10 @@ export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell, gameDate
     ? searchStocks(searchQuery.trim(), 10).filter((r) => !gameTickers.has(r.ticker))
     : []
 
-  type ExtraPrice = { price: number; change: number; changePct: number; isUp: boolean } | null
   const [extraPrices, setExtraPrices] = useState<Map<string, ExtraPrice>>(new Map())
   const [priceLoading, setPriceLoading] = useState(false)
+  const [leveragePrices, setLeveragePrices] = useState<Map<string, ExtraPrice>>(new Map())
+  const [leverageLoading, setLeverageLoading] = useState(false)
 
   const dateStr = useMemo(() => {
     const y = gameDate.getFullYear()
@@ -133,6 +142,25 @@ export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell, gameDate
     const d = String(gameDate.getDate()).padStart(2, '0')
     return `${y}-${m}-${d}`
   }, [gameDate])
+
+  useEffect(() => {
+    setLeverageLoading(true)
+    Promise.all(
+      LEVERAGE_STOCKS.map(async (s) => {
+        try {
+          const res = await fetch(`/api/stock-price?ticker=${s.ticker}&date=${dateStr}`)
+          if (!res.ok) return [s.ticker, null] as const
+          const data = await res.json()
+          return [s.ticker, data as ExtraPrice] as const
+        } catch {
+          return [s.ticker, null] as const
+        }
+      })
+    ).then((entries) => {
+      setLeveragePrices(new Map(entries))
+      setLeverageLoading(false)
+    })
+  }, [dateStr])
 
   useEffect(() => {
     if (extraResults.length === 0) { setExtraPrices(new Map()); return }
@@ -155,6 +183,32 @@ export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell, gameDate
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, dateStr])
+
+  function handleLeverageClick(s: typeof LEVERAGE_STOCKS[number]) {
+    if (leverageLoading) return
+    const priceInfo = leveragePrices.get(s.ticker)
+    const stock: Stock = {
+      id: s.ticker.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0),
+      ticker: s.ticker,
+      name: s.name,
+      nameKr: s.name,
+      price: priceInfo?.price ?? 0,
+      change: priceInfo?.change ?? 0,
+      changePct: priceInfo?.changePct ?? 0,
+      isUp: priceInfo?.isUp ?? true,
+      sparkData: Array(10).fill(priceInfo?.price ?? 0),
+      chartData: [],
+      logoColor: tickerColor(s.ticker),
+      initial: s.ticker.charAt(0),
+      high52w: priceInfo?.price ?? 0,
+      low52w: priceInfo?.price ?? 0,
+      marketCap: "---",
+      per: "---",
+      pbr: "---",
+    }
+    onAddExtraStock(stock, s.ticker)
+    setSelectedStock(stock)
+  }
 
   function handleExtraResultClick(result: KoreanStock) {
     if (priceLoading) return
@@ -355,6 +409,69 @@ export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell, gameDate
             )}
           </div>
         </div>
+
+        {/* ── 레버리지 ETF ── */}
+        {!searchQuery && (
+          <div className="px-4 mb-4">
+            <div className="flex items-center gap-1.5 mb-3">
+              <div className="w-5 h-5 rounded-md bg-purple-100 flex items-center justify-center">
+                <Zap className="w-3 h-3 text-purple-500" strokeWidth={2.5} />
+              </div>
+              <h2 className="text-base font-bold text-foreground">레버리지</h2>
+            </div>
+            <div className="bg-card rounded-2xl card-shadow overflow-hidden">
+              {LEVERAGE_STOCKS.map((s, index) => {
+                const priceInfo = leveragePrices.get(s.ticker)
+                const isHeld = holdings.some((h) => h.ticker === s.ticker)
+                return (
+                  <button
+                    key={s.ticker}
+                    onClick={() => handleLeverageClick(s)}
+                    disabled={leverageLoading}
+                    className={cn(
+                      "w-full px-4 py-3.5 flex items-center gap-3 active:bg-secondary transition-colors",
+                      index < LEVERAGE_STOCKS.length - 1 && "border-b border-border",
+                      leverageLoading && "opacity-60 cursor-not-allowed"
+                    )}
+                    aria-label={`${s.name} 매수/매도`}
+                  >
+                    <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-xs flex-shrink-0", tickerColor(s.ticker))}>
+                      {s.ticker.charAt(0)}
+                    </div>
+                    <div className="flex-1 min-w-0 text-left">
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-sm font-semibold text-foreground truncate">{s.name}</p>
+                        {isHeld && (
+                          <span className="text-[10px] font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded-md flex-shrink-0">
+                            보유중
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <p className="text-xs text-muted-foreground">{s.ticker}</p>
+                        <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-purple-50 text-purple-600">NASDAQ</span>
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0 min-w-[64px]">
+                      {leverageLoading ? (
+                        <Loader2 className="w-3.5 h-3.5 text-muted-foreground animate-spin ml-auto" />
+                      ) : priceInfo ? (
+                        <>
+                          <p className="text-sm font-bold text-foreground">${priceInfo.price.toFixed(2)}</p>
+                          <p className={cn("text-xs font-semibold", priceInfo.isUp ? "stock-up" : "stock-down")}>
+                            {priceInfo.isUp ? "+" : ""}{priceInfo.changePct.toFixed(2)}%
+                          </p>
+                        </>
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground">가격 없음</span>
+                      )}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {/* ── 전체 종목 검색 결과 (게임 미지원 종목) ── */}
         {searchQuery.trim().length >= 1 && extraResults.length > 0 && (
