@@ -176,6 +176,15 @@ export const ALL_STOCKS: Stock[] = [
   },
 ]
 
+export const YAHOO_TICKERS: Record<string, string> = {
+  '005930': '005930.KS',  // 삼성전자
+  '373220': '373220.KS',  // LG에너지솔루션 (2022년 상장)
+  '000660': '000660.KS',  // SK하이닉스
+  '035420': '035420.KS',  // 네이버
+  '035720': '035720.KS',  // 카카오
+  '051910': '051910.KS',  // LG화학
+}
+
 export const INITIAL_HOLDINGS: Holding[] = [
   { ...ALL_STOCKS[0], shares: 15, avgPrice: 68200 },
   { ...ALL_STOCKS[2], shares: 4, avgPrice: 175000 },
