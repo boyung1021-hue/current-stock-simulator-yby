@@ -150,6 +150,31 @@ export const ALL_STOCKS: Stock[] = [
     pbr: "1.6x",
   },
   {
+    id: 7,
+    ticker: "NVDA",
+    name: "NVIDIA",
+    nameKr: "엔비디아",
+    price: 800000,
+    change: 0,
+    changePct: 0,
+    isUp: true,
+    sparkData: [700000, 720000, 710000, 740000, 760000, 750000, 780000, 790000, 795000, 800000],
+    chartData: [
+      { time: "09:00", value: 700000 }, { time: "09:30", value: 720000 },
+      { time: "10:00", value: 710000 }, { time: "10:30", value: 740000 },
+      { time: "11:00", value: 760000 }, { time: "11:30", value: 750000 },
+      { time: "12:00", value: 780000 }, { time: "12:30", value: 790000 },
+      { time: "13:00", value: 795000 }, { time: "15:30", value: 800000 },
+    ],
+    logoColor: "bg-green-600",
+    initial: "N",
+    high52w: 900000,
+    low52w: 500000,
+    marketCap: "3,500조",
+    per: "55.0x",
+    pbr: "42.0x",
+  },
+  {
     id: 6,
     ticker: "051910",
     name: "LG Chem",
@@ -183,7 +208,11 @@ export const YAHOO_TICKERS: Record<string, string> = {
   '035420': '035420.KS',  // 네이버
   '035720': '035720.KS',  // 카카오
   '051910': '051910.KS',  // LG화학
+  'NVDA': 'NVDA',         // 엔비디아 (USD → KRW 환산)
 }
+
+/** USD 가격을 KRW로 환산이 필요한 종목 */
+export const USD_STOCKS = new Set(['NVDA'])
 
 export const INITIAL_HOLDINGS: Holding[] = []
 
