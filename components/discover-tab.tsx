@@ -1,7 +1,7 @@
 "use client"
 
-import { useMemo, useState } from "react"
-import { Search, TrendingUp, ChevronRight, Lock } from "lucide-react"
+import { useMemo, useState, useEffect } from "react"
+import { Search, TrendingUp, Loader2 } from "lucide-react"
 import { Sparkline } from "@/components/sparkline"
 import { StockDetailSheet } from "@/components/stock-detail-sheet"
 import { cn } from "@/lib/utils"
@@ -42,6 +42,16 @@ interface IndexInfo {
   isUp: boolean
 }
 
+const EXTRA_LOGO_COLORS = [
+  "bg-blue-400", "bg-purple-500", "bg-teal-500", "bg-orange-400",
+  "bg-pink-500", "bg-indigo-500", "bg-cyan-500", "bg-amber-500",
+]
+
+function tickerColor(ticker: string): string {
+  const hash = ticker.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0)
+  return EXTRA_LOGO_COLORS[hash % EXTRA_LOGO_COLORS.length]
+}
+
 interface DiscoverTabProps {
   allStocks: Stock[]
   holdings: Holding[]
@@ -50,9 +60,10 @@ interface DiscoverTabProps {
   onSell: (ticker: string, quantity: number, price: number) => void
   gameDate: Date
   getIndexInfo: (yahooTicker: string, date: Date) => IndexInfo | null
+  onAddExtraStock: (stock: Stock, yahooTicker: string) => void
 }
 
-export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell, gameDate, getIndexInfo }: DiscoverTabProps) {
+export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell, gameDate, getIndexInfo, onAddExtraStock }: DiscoverTabProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [marketTab, setMarketTab] = useState("전체")
   const [selectedStock, setSelectedStock] = useState<Stock | null>(null)
@@ -111,6 +122,66 @@ export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell, gameDate
   const extraResults = searchQuery.trim().length >= 1
     ? searchKoreanStocks(searchQuery.trim(), 10).filter((r) => !gameTickers.has(r.ticker))
     : []
+
+  type ExtraPrice = { price: number; change: number; changePct: number; isUp: boolean } | null
+  const [extraPrices, setExtraPrices] = useState<Map<string, ExtraPrice>>(new Map())
+  const [priceLoading, setPriceLoading] = useState(false)
+
+  const dateStr = useMemo(() => {
+    const y = gameDate.getFullYear()
+    const m = String(gameDate.getMonth() + 1).padStart(2, '0')
+    const d = String(gameDate.getDate()).padStart(2, '0')
+    return `${y}-${m}-${d}`
+  }, [gameDate])
+
+  useEffect(() => {
+    if (extraResults.length === 0) { setExtraPrices(new Map()); return }
+    setPriceLoading(true)
+    Promise.all(
+      extraResults.map(async (r) => {
+        const yahooTicker = r.exchange === 'KOSPI' ? `${r.ticker}.KS` : `${r.ticker}.KQ`
+        try {
+          const res = await fetch(`/api/stock-price?ticker=${yahooTicker}&date=${dateStr}`)
+          if (!res.ok) return [r.ticker, null] as const
+          const data = await res.json()
+          return [r.ticker, data as ExtraPrice] as const
+        } catch {
+          return [r.ticker, null] as const
+        }
+      })
+    ).then((entries) => {
+      setExtraPrices(new Map(entries))
+      setPriceLoading(false)
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, dateStr])
+
+  function handleExtraResultClick(result: import("@/lib/korean-stock-db").KoreanStock) {
+    const priceInfo = extraPrices.get(result.ticker)
+    if (!priceInfo) return
+    const yahooTicker = result.exchange === "KOSPI" ? `${result.ticker}.KS` : `${result.ticker}.KQ`
+    const stock: Stock = {
+      id: result.ticker.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0),
+      ticker: result.ticker,
+      name: result.name,
+      nameKr: result.name,
+      price: priceInfo.price,
+      change: priceInfo.change,
+      changePct: priceInfo.changePct,
+      isUp: priceInfo.isUp,
+      sparkData: Array(10).fill(priceInfo.price),
+      chartData: [],
+      logoColor: tickerColor(result.ticker),
+      initial: result.name.charAt(0),
+      high52w: priceInfo.price,
+      low52w: priceInfo.price,
+      marketCap: "---",
+      per: "---",
+      pbr: "---",
+    }
+    onAddExtraStock(stock, yahooTicker)
+    setSelectedStock(stock)
+  }
 
   const selectedHolding = selectedStock
     ? holdings.find((h) => h.ticker === selectedStock.ticker)
@@ -294,17 +365,18 @@ export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell, gameDate
             </div>
             <div className="bg-card rounded-2xl card-shadow overflow-hidden">
               {extraResults.map((result, index) => (
-                <div
+                <button
                   key={result.ticker}
+                  onClick={() => handleExtraResultClick(result)}
+                  disabled={priceLoading || !extraPrices.get(result.ticker)}
                   className={cn(
-                    "px-4 py-3.5 flex items-center gap-3",
-                    index < extraResults.length - 1 && "border-b border-border"
+                    "w-full px-4 py-3.5 flex items-center gap-3 active:bg-secondary transition-colors",
+                    index < extraResults.length - 1 && "border-b border-border",
+                    (priceLoading || !extraPrices.get(result.ticker)) && "opacity-60 cursor-not-allowed"
                   )}
                 >
-                  <div className="w-9 h-9 rounded-xl bg-secondary flex items-center justify-center flex-shrink-0">
-                    <span className="text-xs font-bold text-muted-foreground">
-                      {result.name.charAt(0)}
-                    </span>
+                  <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-white font-bold text-xs", tickerColor(result.ticker))}>
+                    {result.name.charAt(0)}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-foreground truncate">{result.name}</p>
@@ -320,11 +392,23 @@ export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell, gameDate
                       </span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1 text-muted-foreground flex-shrink-0">
-                    <Lock className="w-3 h-3" />
-                    <span className="text-[10px]">게임 미지원</span>
+                  <div className="text-right flex-shrink-0 min-w-[64px]">
+                    {priceLoading ? (
+                      <Loader2 className="w-3.5 h-3.5 text-muted-foreground animate-spin ml-auto" />
+                    ) : extraPrices.get(result.ticker) ? (
+                      <>
+                        <p className="text-sm font-bold text-foreground">
+                          ₩{extraPrices.get(result.ticker)!.price.toLocaleString()}
+                        </p>
+                        <p className={cn("text-xs font-semibold", extraPrices.get(result.ticker)!.isUp ? "stock-up" : "stock-down")}>
+                          {extraPrices.get(result.ticker)!.isUp ? "+" : ""}{extraPrices.get(result.ticker)!.changePct.toFixed(2)}%
+                        </p>
+                      </>
+                    ) : (
+                      <span className="text-[10px] text-muted-foreground">조회 불가</span>
+                    )}
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           </div>
