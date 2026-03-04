@@ -6,7 +6,7 @@ import { Sparkline } from "@/components/sparkline"
 import { StockDetailSheet } from "@/components/stock-detail-sheet"
 import { cn } from "@/lib/utils"
 import type { Stock, Holding } from "@/lib/stocks"
-import { searchKoreanStocks } from "@/lib/korean-stock-db"
+import { searchStocks, type KoreanStock } from "@/lib/korean-stock-db"
 
 function fmtValue(n: number, decimals: number): string {
   return n.toLocaleString("ko-KR", { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
@@ -120,7 +120,7 @@ export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell, gameDate
   // 게임에 없는 한국 주식 (로컬 DB 검색, 즉각 반응)
   const gameTickers = new Set(allStocks.map((s) => s.ticker))
   const extraResults = searchQuery.trim().length >= 1
-    ? searchKoreanStocks(searchQuery.trim(), 10).filter((r) => !gameTickers.has(r.ticker))
+    ? searchStocks(searchQuery.trim(), 10).filter((r) => !gameTickers.has(r.ticker))
     : []
 
   type ExtraPrice = { price: number; change: number; changePct: number; isUp: boolean } | null
@@ -139,7 +139,7 @@ export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell, gameDate
     setPriceLoading(true)
     Promise.all(
       extraResults.map(async (r) => {
-        const yahooTicker = r.exchange === 'KOSPI' ? `${r.ticker}.KS` : `${r.ticker}.KQ`
+        const yahooTicker = r.exchange === 'KOSPI' ? `${r.ticker}.KS` : r.exchange === 'KOSDAQ' ? `${r.ticker}.KQ` : r.ticker
         try {
           const res = await fetch(`/api/stock-price?ticker=${yahooTicker}&date=${dateStr}`)
           if (!res.ok) return [r.ticker, null] as const
@@ -156,25 +156,25 @@ export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell, gameDate
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, dateStr])
 
-  function handleExtraResultClick(result: import("@/lib/korean-stock-db").KoreanStock) {
+  function handleExtraResultClick(result: KoreanStock) {
+    if (priceLoading) return
     const priceInfo = extraPrices.get(result.ticker)
-    if (!priceInfo) return
-    const yahooTicker = result.exchange === "KOSPI" ? `${result.ticker}.KS` : `${result.ticker}.KQ`
+    const yahooTicker = result.exchange === "KOSPI" ? `${result.ticker}.KS` : result.exchange === "KOSDAQ" ? `${result.ticker}.KQ` : result.ticker
     const stock: Stock = {
       id: result.ticker.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0),
       ticker: result.ticker,
       name: result.name,
       nameKr: result.name,
-      price: priceInfo.price,
-      change: priceInfo.change,
-      changePct: priceInfo.changePct,
-      isUp: priceInfo.isUp,
-      sparkData: Array(10).fill(priceInfo.price),
+      price: priceInfo?.price ?? 0,
+      change: priceInfo?.change ?? 0,
+      changePct: priceInfo?.changePct ?? 0,
+      isUp: priceInfo?.isUp ?? true,
+      sparkData: Array(10).fill(priceInfo?.price ?? 0),
       chartData: [],
       logoColor: tickerColor(result.ticker),
       initial: result.name.charAt(0),
-      high52w: priceInfo.price,
-      low52w: priceInfo.price,
+      high52w: priceInfo?.price ?? 0,
+      low52w: priceInfo?.price ?? 0,
       marketCap: "---",
       per: "---",
       pbr: "---",
@@ -368,11 +368,11 @@ export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell, gameDate
                 <button
                   key={result.ticker}
                   onClick={() => handleExtraResultClick(result)}
-                  disabled={priceLoading || !extraPrices.get(result.ticker)}
+                  disabled={priceLoading}
                   className={cn(
                     "w-full px-4 py-3.5 flex items-center gap-3 active:bg-secondary transition-colors",
                     index < extraResults.length - 1 && "border-b border-border",
-                    (priceLoading || !extraPrices.get(result.ticker)) && "opacity-60 cursor-not-allowed"
+                    priceLoading && "opacity-60 cursor-not-allowed"
                   )}
                 >
                   <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-white font-bold text-xs", tickerColor(result.ticker))}>
@@ -386,7 +386,9 @@ export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell, gameDate
                         "text-[9px] font-bold px-1 py-0.5 rounded",
                         result.exchange === "KOSPI"
                           ? "bg-blue-50 text-blue-600"
-                          : "bg-green-50 text-green-600"
+                          : result.exchange === "KOSDAQ"
+                          ? "bg-green-50 text-green-600"
+                          : "bg-purple-50 text-purple-600"
                       )}>
                         {result.exchange}
                       </span>
@@ -405,7 +407,7 @@ export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell, gameDate
                         </p>
                       </>
                     ) : (
-                      <span className="text-[10px] text-muted-foreground">조회 불가</span>
+                      <span className="text-[10px] text-muted-foreground">가격 없음</span>
                     )}
                   </div>
                 </button>
