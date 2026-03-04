@@ -1,11 +1,11 @@
-/** 한국 주요 상장 종목 검색용 데이터베이스 */
+/** 주요 상장 종목 검색용 데이터베이스 */
 export type KoreanStock = {
-  ticker: string    // 6자리 종목코드
-  name: string      // 한글 종목명
-  exchange: 'KOSPI' | 'KOSDAQ'
+  ticker: string    // 종목코드
+  name: string      // 종목명
+  exchange: 'KOSPI' | 'KOSDAQ' | 'NYSE' | 'NASDAQ'
 }
 
-export const KOREAN_STOCK_DB: KoreanStock[] = [
+export const GLOBAL_STOCK_DB: KoreanStock[] = [
   // ── KOSPI 시가총액 상위 ──────────────────────────────
   { ticker: '005930', name: '삼성전자', exchange: 'KOSPI' },
   { ticker: '000660', name: 'SK하이닉스', exchange: 'KOSPI' },
@@ -58,6 +58,24 @@ export const KOREAN_STOCK_DB: KoreanStock[] = [
   { ticker: '035900', name: 'JYP Ent.', exchange: 'KOSPI' },
   { ticker: '122630', name: 'KODEX 레버리지', exchange: 'KOSPI' },
 
+  // ── 미국 주요 종목 ───────────────────────────────────
+  { ticker: 'AAPL',  name: 'Apple',     exchange: 'NASDAQ' },
+  { ticker: 'MSFT',  name: 'Microsoft', exchange: 'NASDAQ' },
+  { ticker: 'NVDA',  name: 'NVIDIA',    exchange: 'NASDAQ' },
+  { ticker: 'AMZN',  name: 'Amazon',    exchange: 'NASDAQ' },
+  { ticker: 'GOOGL', name: 'Alphabet',  exchange: 'NASDAQ' },
+  { ticker: 'META',  name: 'Meta',      exchange: 'NASDAQ' },
+  { ticker: 'TSLA',  name: 'Tesla',     exchange: 'NASDAQ' },
+  { ticker: 'GME',   name: 'GameStop',  exchange: 'NYSE'   },
+  { ticker: 'NFLX',  name: 'Netflix',   exchange: 'NASDAQ' },
+  { ticker: 'ZM',    name: 'Zoom',      exchange: 'NASDAQ' },
+  { ticker: 'PTON',  name: 'Peloton',   exchange: 'NASDAQ' },
+  { ticker: 'SPY',   name: 'SPDR S&P 500 ETF', exchange: 'NYSE' },
+  { ticker: 'QQQ',   name: 'Invesco QQQ ETF',       exchange: 'NASDAQ' },
+  { ticker: 'TQQQ',  name: 'ProShares UltraPro QQQ', exchange: 'NASDAQ' },
+  { ticker: 'SOXL',  name: 'Direxion Daily Semi Bull 3X', exchange: 'NYSE' },
+  { ticker: 'SQQQ',  name: 'ProShares UltraPro Short QQQ', exchange: 'NASDAQ' },
+
   // ── KOSDAQ 시가총액 상위 ─────────────────────────────
   { ticker: '247540', name: '에코프로비엠', exchange: 'KOSDAQ' },
   { ticker: '086520', name: '에코프로', exchange: 'KOSDAQ' },
@@ -82,11 +100,11 @@ export const KOREAN_STOCK_DB: KoreanStock[] = [
 ]
 
 /** 쿼리로 종목 검색 (한글명·티커코드 모두 지원) */
-export function searchKoreanStocks(query: string, limit = 10): KoreanStock[] {
+export function searchStocks(query: string, limit = 10): KoreanStock[] {
   const q = query.trim().toLowerCase()
   if (q.length < 1) return []
 
-  return KOREAN_STOCK_DB
+  return GLOBAL_STOCK_DB
     .filter((s) =>
       s.name.toLowerCase().includes(q) ||
       s.ticker.includes(q)
