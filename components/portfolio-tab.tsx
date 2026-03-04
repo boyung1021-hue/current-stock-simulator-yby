@@ -1,140 +1,60 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
-import { Eye, EyeOff, TrendingUp, TrendingDown } from "lucide-react"
+import { useState } from "react"
+import { Bell, Eye, EyeOff, TrendingUp, TrendingDown } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { PortfolioChart } from "@/components/portfolio-chart"
 import { StockDetailSheet } from "@/components/stock-detail-sheet"
 import type { Holding } from "@/lib/stocks"
 
-// ── useCountUp: eased integer animation ───────────────────
-function useCountUp(target: number, duration = 260) {
-  const [displayed, setDisplayed] = useState(target)
-  const fromRef = useRef(target)
-  const rafRef = useRef<number>(0)
-  const mountedRef = useRef(false)
+const PORTFOLIO_CHART_DATA = [
+  { time: "09:00", value: 12400000 },
+  { time: "09:30", value: 12550000 },
+  { time: "10:00", value: 12480000 },
+  { time: "10:30", value: 12620000 },
+  { time: "11:00", value: 12710000 },
+  { time: "11:30", value: 12690000 },
+  { time: "12:00", value: 12750000 },
+  { time: "12:30", value: 12800000 },
+  { time: "13:00", value: 12880000 },
+  { time: "13:30", value: 12920000 },
+  { time: "14:00", value: 12860000 },
+  { time: "14:30", value: 12990000 },
+  { time: "15:00", value: 13100000 },
+  { time: "15:30", value: 13080000 },
+]
 
-  useEffect(() => {
-    if (!mountedRef.current) { mountedRef.current = true; return }
-    cancelAnimationFrame(rafRef.current)
-    const from = fromRef.current
-    const startTime = performance.now()
-    const tick = (now: number) => {
-      const t = Math.min((now - startTime) / duration, 1)
-      const eased = 1 - Math.pow(1 - t, 3)
-      const next = Math.round(from + (target - from) * eased)
-      setDisplayed(next)
-      if (t < 1) { rafRef.current = requestAnimationFrame(tick) }
-      else { fromRef.current = target }
-    }
-    rafRef.current = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(rafRef.current)
-  }, [target, duration])
+const PERIOD_TABS = ["1D", "1W", "1M", "3M", "1Y"]
 
-  return displayed
-}
-
-// ── useSlide: slide-in direction on value change ──────────
-function useSlide(value: number) {
-  const prevRef = useRef(value)
-  const mountedRef = useRef(false)
-  const [animKey, setAnimKey] = useState(0)
-  const [slideClass, setSlideClass] = useState("")
-
-  useEffect(() => {
-    if (!mountedRef.current) { mountedRef.current = true; return }
-    if (prevRef.current === value) return
-    setSlideClass(value > prevRef.current ? "anim-slide-up" : "anim-slide-down")
-    setAnimKey(k => k + 1)
-    prevRef.current = value
-  }, [value])
-
-  return { animKey, slideClass }
-}
-
-// ── SVG Sparkline ─────────────────────────────────────────
-function Sparkline({ data, isUp }: { data: number[]; isUp: boolean }) {
-  if (data.length < 2) return null
-
-  const H = 48
-  const W = 100
-  const min = Math.min(...data)
-  const max = Math.max(...data)
-  const range = max - min || 1
-  const pad = 4
-
-  const pts = data.map((v, i) => {
-    const x = (i / (data.length - 1)) * W
-    const y = H - pad - ((v - min) / range) * (H - pad * 2)
-    return [x, y] as [number, number]
-  })
-
-  const line = pts.map(([x, y], i) => `${i === 0 ? "M" : "L"} ${x} ${y}`).join(" ")
-  const fill = `${line} L ${W} ${H} L 0 ${H} Z`
-
-  const stroke = isUp ? "var(--stock-up)" : "var(--stock-down)"
-  const fillColor = isUp
-    ? "oklch(0.57 0.22 25 / 0.12)"
-    : "oklch(0.5 0.18 255 / 0.12)"
-
-  return (
-    <svg
-      viewBox={`0 0 ${W} ${H}`}
-      className="w-full"
-      preserveAspectRatio="none"
-      style={{ height: H }}
-    >
-      <path d={fill} fill={fillColor} />
-      <path
-        d={line}
-        fill="none"
-        stroke={stroke}
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        vectorEffect="non-scaling-stroke"
-      />
-    </svg>
-  )
-}
-
-// ── Types ──────────────────────────────────────────────────
 interface PortfolioTabProps {
   holdings: Holding[]
   cash: number
-  assetHistory?: number[]
   onBuy: (ticker: string, quantity: number, price: number) => void
   onSell: (ticker: string, quantity: number, price: number) => void
 }
 
-// ── Component ──────────────────────────────────────────────
-export function PortfolioTab({ holdings, cash, assetHistory, onBuy, onSell }: PortfolioTabProps) {
+export function PortfolioTab({ holdings, cash, onBuy, onSell }: PortfolioTabProps) {
+  const [selectedPeriod, setSelectedPeriod] = useState("1D")
   const [hideBalance, setHideBalance] = useState(false)
   const [selectedStock, setSelectedStock] = useState<Holding | null>(null)
 
-  const stockValue = holdings.reduce((sum, h) => sum + h.price * h.shares, 0)
-  const totalValue = stockValue + cash
+  const totalValue = holdings.reduce((sum, h) => sum + h.price * h.shares, 0)
   const totalInvested = holdings.reduce((sum, h) => sum + h.avgPrice * h.shares, 0)
-  const totalGain = stockValue - totalInvested
+  const totalGain = totalValue - totalInvested
   const totalGainPct = totalInvested > 0 ? (totalGain / totalInvested) * 100 : 0
   const isTotalUp = totalGain >= 0
 
-  const todayGain = holdings.reduce((sum, h) => sum + h.change * h.shares, 0)
-  const todayIsUp = todayGain >= 0
-
-  // Animated display values
-  const animTotalValue = useCountUp(totalValue)
-  const animStockValue = useCountUp(stockValue)
-  const animTodayGain  = useCountUp(todayGain)
-  const { animKey: pctKey, slideClass: pctSlide } = useSlide(totalGainPct)
+  const todayGain = 283000
+  const todayGainPct = 2.21
+  const todayIsUp = true
 
   const mask = (val: string) => (hideBalance ? "•••••" : val)
-  const hasHoldings = holdings.length > 0
 
   return (
     <>
       <div className="flex flex-col min-h-0">
-        {/* ── Header ────────────────────────────────────── */}
-        <header className="flex items-center justify-between px-5 pt-2 pb-4 bg-background">
+        {/* Header */}
+        <header className="flex items-center justify-between px-5 pt-14 pb-4 bg-background">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
               <span className="text-primary-foreground text-sm font-bold">J</span>
@@ -144,110 +64,90 @@ export function PortfolioTab({ holdings, cash, assetHistory, onBuy, onSell }: Po
               <p className="text-sm font-semibold text-foreground leading-tight mt-0.5">James Kim</p>
             </div>
           </div>
+          <button
+            className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center active:scale-95 transition-transform"
+            aria-label="알림"
+          >
+            <Bell className="w-[18px] h-[18px] text-foreground" strokeWidth={1.8} />
+          </button>
         </header>
 
-        {/* ── Top Summary Card ──────────────────────────── */}
+        {/* ── Top Summary Card ─────────────────────────── */}
         <div className="mx-4 mb-4">
-          <div className="bg-card rounded-2xl card-shadow overflow-hidden">
-            <div className="px-5 pt-5 pb-4">
-              {/* Row: label + eye toggle */}
-              <div className="flex items-center justify-between mb-5">
-                <p className="text-[11px] text-muted-foreground font-medium tracking-wide uppercase">내 포트폴리오</p>
-                <button
-                  onClick={() => setHideBalance(!hideBalance)}
-                  className="text-muted-foreground active:scale-95 transition-transform"
-                  aria-label={hideBalance ? "금액 표시" : "금액 숨기기"}
-                >
-                  {hideBalance
-                    ? <EyeOff className="w-[15px] h-[15px]" />
-                    : <Eye className="w-[15px] h-[15px]" />}
-                </button>
-              </div>
-
-              {/* 수익률 — hero number (slide animation on change) */}
-              <div className="overflow-hidden">
-                <div
-                  key={pctKey}
-                  className={cn(
-                    "text-[42px] font-extrabold leading-none tracking-tight",
-                    pctSlide,
-                    hasHoldings ? (isTotalUp ? "stock-up" : "stock-down") : "text-muted-foreground"
-                  )}
-                >
-                  {hideBalance
-                    ? "•••%"
-                    : hasHoldings
-                      ? `${isTotalUp ? "+" : ""}${totalGainPct.toFixed(2)}%`
-                      : "0.00%"}
-                </div>
-              </div>
-              <p className="text-[11px] text-muted-foreground mt-1.5 mb-5">수익률</p>
-
-              {/* 총 평가금액 (count-up) */}
-              <p className="text-[20px] font-bold text-foreground leading-none tracking-tight tabular-nums">
-                {hideBalance ? "•••••••" : `₩${animTotalValue.toLocaleString()}`}
-              </p>
-              <p className="text-[11px] text-muted-foreground mt-1.5 mb-4">총 평가금액</p>
-
-              {/* Today's change pill (count-up) */}
-              <div className={cn(
-                "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full",
-                hasHoldings
-                  ? (todayIsUp ? "bg-stock-up-soft" : "bg-stock-down-soft")
-                  : "bg-secondary"
-              )}>
-                {hasHoldings && (
-                  todayIsUp
-                    ? <TrendingUp className="w-3 h-3 stock-up" strokeWidth={2.5} />
-                    : <TrendingDown className="w-3 h-3 stock-down" strokeWidth={2.5} />
-                )}
-                <span className={cn(
-                  "text-[11px] font-bold tabular-nums",
-                  hasHoldings ? (todayIsUp ? "stock-up" : "stock-down") : "text-muted-foreground"
-                )}>
-                  {hideBalance
-                    ? "•••"
-                    : hasHoldings
-                      ? `${todayIsUp ? "+" : ""}₩${animTodayGain.toLocaleString()}`
-                      : "₩0"}
-                </span>
-                <span className="text-[10px] text-muted-foreground">오늘</span>
-              </div>
-
-              {/* 3-stat row: 예수금 / 투자금 / 평가금액 */}
-              <div className="flex mt-5 pt-4 border-t border-border">
-                <div className="flex-1">
-                  <p className="text-[10px] text-muted-foreground mb-1.5">예수금</p>
-                  <p className="text-[13px] font-bold text-foreground tabular-nums">
-                    {mask(`₩${cash.toLocaleString()}`)}
-                  </p>
-                </div>
-                <div className="w-px bg-border self-stretch mx-3" />
-                <div className="flex-1">
-                  <p className="text-[10px] text-muted-foreground mb-1.5">투자금</p>
-                  <p className="text-[13px] font-bold text-foreground tabular-nums">
-                    {mask(`₩${totalInvested.toLocaleString()}`)}
-                  </p>
-                </div>
-                <div className="w-px bg-border self-stretch mx-3" />
-                <div className="flex-1">
-                  <p className="text-[10px] text-muted-foreground mb-1.5">평가금액</p>
-                  <p className={cn(
-                    "text-[13px] font-bold tabular-nums",
-                    hasHoldings ? (isTotalUp ? "stock-up" : "stock-down") : "text-foreground"
-                  )}>
-                    {mask(`₩${animStockValue.toLocaleString()}`)}
-                  </p>
-                </div>
-              </div>
+          <div className="bg-card rounded-2xl card-shadow p-5">
+            {/* Total value */}
+            <div className="flex items-start justify-between mb-1">
+              <p className="text-[11px] text-muted-foreground">총 평가금액</p>
+              <button
+                onClick={() => setHideBalance(!hideBalance)}
+                className="text-muted-foreground active:scale-95 transition-transform -mt-0.5"
+                aria-label={hideBalance ? "금액 표시" : "금액 숨기기"}
+              >
+                {hideBalance
+                  ? <EyeOff className="w-[15px] h-[15px]" />
+                  : <Eye className="w-[15px] h-[15px]" />}
+              </button>
             </div>
 
-            {/* Sparkline — full-width, flush to card bottom */}
-            {assetHistory && assetHistory.length >= 2 && (
-              <div className="px-0 pb-0">
-                <Sparkline data={assetHistory} isUp={isTotalUp} />
+            <p className="text-[32px] font-bold text-foreground leading-none tracking-tight mb-2">
+              {hideBalance ? "•••••••" : `₩${totalValue.toLocaleString()}`}
+            </p>
+
+            {/* Today's change */}
+            <div className="flex items-center gap-2 mb-4">
+              <span className={cn("flex items-center gap-0.5 text-sm font-semibold", todayIsUp ? "stock-up" : "stock-down")}>
+                {todayIsUp
+                  ? <TrendingUp className="w-3.5 h-3.5" strokeWidth={2.2} />
+                  : <TrendingDown className="w-3.5 h-3.5" strokeWidth={2.2} />}
+                {hideBalance ? "•••" : `${todayIsUp ? "+" : ""}₩${todayGain.toLocaleString()}`}
+              </span>
+              <span className={cn("text-[11px] font-semibold px-1.5 py-0.5 rounded-md",
+                todayIsUp ? "bg-stock-up-soft stock-up" : "bg-stock-down-soft stock-down")}>
+                {todayIsUp ? "+" : ""}{todayGainPct.toFixed(2)}%
+              </span>
+              <span className="text-[11px] text-muted-foreground">오늘</span>
+            </div>
+
+            {/* Period selector */}
+            <div className="flex gap-1 mb-3">
+              {PERIOD_TABS.map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setSelectedPeriod(p)}
+                  className={cn(
+                    "px-2.5 py-1 text-[11px] font-semibold rounded-lg transition-all active:scale-95",
+                    selectedPeriod === p
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground"
+                  )}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+
+            {/* Chart */}
+            <PortfolioChart data={PORTFOLIO_CHART_DATA} isUp={todayIsUp} />
+
+            {/* 3-stat row */}
+            <div className="flex gap-0 mt-4 pt-4 border-t border-border">
+              <div className="flex-1">
+                <p className="text-[11px] text-muted-foreground mb-1">예수금</p>
+                <p className="text-sm font-bold text-foreground tabular-nums">{mask(`₩${cash.toLocaleString()}`)}</p>
               </div>
-            )}
+              <div className="flex-1">
+                <p className="text-[11px] text-muted-foreground mb-1">총 손익</p>
+                <p className={cn("text-sm font-bold tabular-nums", isTotalUp ? "stock-up" : "stock-down")}>
+                  {mask(`${isTotalUp ? "+" : ""}₩${totalGain.toLocaleString()}`)}
+                </p>
+              </div>
+              <div className="flex-1">
+                <p className="text-[11px] text-muted-foreground mb-1">수익률</p>
+                <p className={cn("text-sm font-bold", isTotalUp ? "stock-up" : "stock-down")}>
+                  {hideBalance ? "•••" : `${isTotalUp ? "+" : ""}${totalGainPct.toFixed(2)}%`}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
 
