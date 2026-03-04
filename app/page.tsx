@@ -1,13 +1,13 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { BottomNav } from "@/components/bottom-nav"
 import { PortfolioTab } from "@/components/portfolio-tab"
 import { DiscoverTab } from "@/components/discover-tab"
 import { DateNavigator } from "@/components/date-navigator"
 import { cn } from "@/lib/utils"
 import { ALL_STOCKS, INITIAL_HOLDINGS, INITIAL_CASH, type Holding } from "@/lib/stocks"
-import { GAME_START, clamp, nextTradingDay, advanceWeek, advanceMonth, advanceYear, toTradingDay } from "@/lib/game-date"
+import { GAME_START, GAME_END, clamp, nextTradingDay, advanceWeek, advanceMonth, advanceYear, toTradingDay } from "@/lib/game-date"
 import { useHistoricalData } from "@/hooks/use-historical-data"
 
 type AdvanceType = 'day' | 'week' | 'month' | 'year'
@@ -24,6 +24,27 @@ export default function StockApp() {
   const [holdings, setHoldings] = useState<Holding[]>(INITIAL_HOLDINGS)
   const [cash, setCash] = useState(INITIAL_CASH)
   const [gameDate, setGameDate] = useState<Date>(new Date(GAME_START))
+  const [autoAdvancing, setAutoAdvancing] = useState(true)
+  const [countdown, setCountdown] = useState(30)
+  const isAtEnd = gameDate >= GAME_END
+
+  // 30초마다 1년 자동 진행
+  useEffect(() => {
+    if (!autoAdvancing || isAtEnd) return
+    const id = setInterval(() => {
+      setCountdown((c) => {
+        if (c <= 1) {
+          setGameDate((prev) => clamp(advanceYear(prev)))
+          return 30
+        }
+        return c - 1
+      })
+    }, 1000)
+    return () => clearInterval(id)
+  }, [autoAdvancing, isAtEnd])
+
+  // 날짜가 수동으로 바뀌면 카운트다운 리셋
+  useEffect(() => { setCountdown(30) }, [gameDate])
 
   const { loading, priceMap, getPriceInfo, getIndexInfo, addExtraTicker } = useHistoricalData()
   const [extraStocks, setExtraStocks] = useState<import("@/lib/stocks").Stock[]>([])
@@ -58,7 +79,9 @@ export default function StockApp() {
   }
 
   function handleJump(date: Date) {
-    setGameDate(clamp(toTradingDay(date)))
+    const next = clamp(toTradingDay(date))
+    if (next <= gameDate) return  // 과거로 이동 불가
+    setGameDate(next)
   }
 
   function handleBuy(ticker: string, quantity: number, price: number) {
@@ -99,7 +122,15 @@ export default function StockApp() {
       {/* Phone frame wrapper */}
       <div className="relative w-full max-w-sm min-h-screen flex flex-col">
         {/* Fixed date navigator */}
-        <DateNavigator gameDate={gameDate} onAdvance={handleAdvance} onJump={handleJump} loading={loading} />
+        <DateNavigator
+          gameDate={gameDate}
+          onAdvance={handleAdvance}
+          onJump={handleJump}
+          loading={loading}
+          countdown={countdown}
+          autoAdvancing={autoAdvancing}
+          onToggleAutoAdvance={() => setAutoAdvancing((v) => !v)}
+        />
 
         {/* Scrollable content area */}
         <div
