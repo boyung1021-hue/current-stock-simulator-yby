@@ -25,15 +25,23 @@ export default function StockApp() {
   const [cash, setCash] = useState(INITIAL_CASH)
   const [gameDate, setGameDate] = useState<Date>(new Date(GAME_START))
 
-  const { loading, priceMap, getPriceInfo, getIndexInfo } = useHistoricalData()
+  const { loading, priceMap, getPriceInfo, getIndexInfo, addExtraTicker } = useHistoricalData()
+  const [extraStocks, setExtraStocks] = useState<import("@/lib/stocks").Stock[]>([])
+
+  function handleAddExtraStock(stock: import("@/lib/stocks").Stock, yahooTicker: string) {
+    setExtraStocks((prev) => prev.some((s) => s.ticker === stock.ticker) ? prev : [...prev, stock])
+    addExtraTicker(stock.ticker, yahooTicker)
+  }
+
+  const allStocksWithExtra = useMemo(() => [...ALL_STOCKS, ...extraStocks], [extraStocks])
 
   // Stocks with real historical prices for the current gameDate
   const currentStocks = useMemo(() => {
-    return ALL_STOCKS.map((s) => {
+    return allStocksWithExtra.map((s) => {
       const info = getPriceInfo(s.ticker, gameDate)
       return info ? { ...s, ...info } : s
     })
-  }, [gameDate, priceMap, getPriceInfo])
+  }, [gameDate, priceMap, getPriceInfo, allStocksWithExtra])
 
   // Holdings with updated market prices
   const currentHoldings = useMemo(() => {
@@ -136,6 +144,7 @@ export default function StockApp() {
                 onSell={handleSell}
                 gameDate={gameDate}
                 getIndexInfo={getIndexInfo}
+                onAddExtraStock={handleAddExtraStock}
               />
             )}
           </div>

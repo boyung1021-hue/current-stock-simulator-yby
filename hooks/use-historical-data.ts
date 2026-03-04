@@ -32,6 +32,7 @@ function binarySearch(arr: DayPrice[], target: string): number {
 export function useHistoricalData() {
   const [priceMap, setPriceMap] = useState<PriceMap>(new Map())
   const [loading, setLoading] = useState(true)
+  const [dynamicYahooTickers, setDynamicYahooTickers] = useState<Record<string, string>>({})
 
   useEffect(() => {
     const tickers = [...Object.values(YAHOO_TICKERS), ...INDEX_TICKERS]
@@ -67,8 +68,8 @@ export function useHistoricalData() {
       isUp: boolean
       sparkData: number[]
     } | null => {
-      // Look up by yahoo ticker (e.g. "005930.KS")
-      const yahooTicker = YAHOO_TICKERS[ticker]
+      // Look up by yahoo ticker (e.g. "005930.KS"), including dynamically added tickers
+      const yahooTicker = YAHOO_TICKERS[ticker] ?? dynamicYahooTickers[ticker]
       if (!yahooTicker) return null
 
       const arr = priceMap.get(yahooTicker)
@@ -131,8 +132,21 @@ export function useHistoricalData() {
 
       return { value, change, changePct, isUp }
     },
-    [priceMap]
+    [priceMap, dynamicYahooTickers]
   )
 
-  return { loading, priceMap, getPriceInfo, getIndexInfo }
+  function addExtraTicker(ticker: string, yahooTicker: string) {
+    if (YAHOO_TICKERS[ticker] || dynamicYahooTickers[ticker]) return
+    setDynamicYahooTickers((prev) => ({ ...prev, [ticker]: yahooTicker }))
+    fetch(`/api/stock-history?ticker=${yahooTicker}`)
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data: DayPrice[]) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setPriceMap((prev) => new Map(prev).set(yahooTicker, data))
+        }
+      })
+      .catch(() => {})
+  }
+
+  return { loading, priceMap, getPriceInfo, getIndexInfo, addExtraTicker }
 }
