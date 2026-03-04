@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { Search, TrendingUp, ChevronRight, Lock } from "lucide-react"
 import { Sparkline } from "@/components/sparkline"
 import { StockDetailSheet } from "@/components/stock-detail-sheet"
@@ -8,11 +8,19 @@ import { cn } from "@/lib/utils"
 import type { Stock, Holding } from "@/lib/stocks"
 import { searchKoreanStocks } from "@/lib/korean-stock-db"
 
-const MARKET_INDICES = [
-  { name: "KOSPI", value: "2,614.30", change: "+18.42", changePct: "+0.71%", isUp: true },
-  { name: "KOSDAQ", value: "854.76", change: "-4.18", changePct: "-0.49%", isUp: false },
-  { name: "USD/KRW", value: "1,328.5", change: "+3.50", changePct: "+0.26%", isUp: true },
-]
+function fmtValue(n: number, decimals: number): string {
+  return n.toLocaleString("ko-KR", { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
+}
+
+function fmtChange(n: number, decimals: number): string {
+  const sign = n >= 0 ? "+" : ""
+  return `${sign}${n.toLocaleString("ko-KR", { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}`
+}
+
+function fmtPct(n: number): string {
+  const sign = n >= 0 ? "+" : ""
+  return `${sign}${n.toFixed(2)}%`
+}
 
 const STOCK_RANKS: Record<string, { rank: number; volume: string }> = {
   "005930": { rank: 1, volume: "15.2M" },
@@ -33,18 +41,57 @@ const THEME_SECTORS = [
 
 const MARKET_TABS = ["전체", "상승", "하락", "거래량"]
 
+interface IndexInfo {
+  value: number
+  change: number
+  changePct: number
+  isUp: boolean
+}
+
 interface DiscoverTabProps {
   allStocks: Stock[]
   holdings: Holding[]
   cash: number
   onBuy: (ticker: string, quantity: number, price: number) => void
   onSell: (ticker: string, quantity: number, price: number) => void
+  gameDate: Date
+  getIndexInfo: (yahooTicker: string, date: Date) => IndexInfo | null
 }
 
-export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell }: DiscoverTabProps) {
+export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell, gameDate, getIndexInfo }: DiscoverTabProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [marketTab, setMarketTab] = useState("전체")
   const [selectedStock, setSelectedStock] = useState<Stock | null>(null)
+
+  const marketIndices = useMemo(() => {
+    const kospi = getIndexInfo('^KS11', gameDate)
+    const kosdaq = getIndexInfo('^KQ11', gameDate)
+    const usdkrw = getIndexInfo('KRW=X', gameDate)
+
+    return [
+      {
+        name: "KOSPI",
+        value: kospi ? fmtValue(kospi.value, 2) : "---",
+        change: kospi ? fmtChange(kospi.change, 2) : "---",
+        changePct: kospi ? fmtPct(kospi.changePct) : "---",
+        isUp: kospi?.isUp ?? true,
+      },
+      {
+        name: "KOSDAQ",
+        value: kosdaq ? fmtValue(kosdaq.value, 2) : "---",
+        change: kosdaq ? fmtChange(kosdaq.change, 2) : "---",
+        changePct: kosdaq ? fmtPct(kosdaq.changePct) : "---",
+        isUp: kosdaq?.isUp ?? true,
+      },
+      {
+        name: "USD/KRW",
+        value: usdkrw ? fmtValue(usdkrw.value, 1) : "---",
+        change: usdkrw ? fmtChange(usdkrw.change, 1) : "---",
+        changePct: usdkrw ? fmtPct(usdkrw.changePct) : "---",
+        isUp: usdkrw?.isUp ?? true,
+      },
+    ]
+  }, [gameDate, getIndexInfo])
 
   // Only show ranked stocks (those with a rank) in the hot list, unless searching
   const rankedStocks = allStocks.filter((s) => STOCK_RANKS[s.ticker])
@@ -100,7 +147,7 @@ export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell }: Discov
         {!searchQuery && (
           <div className="px-4 mb-5">
             <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-hide">
-              {MARKET_INDICES.map((idx) => (
+              {marketIndices.map((idx) => (
                 <div
                   key={idx.name}
                   className="bg-card rounded-2xl card-shadow p-3.5 flex-shrink-0 min-w-[120px]"
@@ -290,38 +337,38 @@ export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell }: Discov
         )}
 
         {/* News / Market Digest */}
-        {!searchQuery && (
-          <div className="px-4 mb-4">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-base font-bold text-foreground">오늘의 시장</h2>
-            </div>
-            <div className="flex flex-col gap-2.5">
-              {[
-                { headline: "반도체 수출 전월 대비 18% 급증", time: "14분 전", tag: "반도체" },
-                { headline: "미 연준, 금리 동결 시사 발언에 코스피 상승", time: "32분 전", tag: "거시경제" },
-                { headline: "LG에너지솔루션, 북미 배터리 공장 증설 발표", time: "1시간 전", tag: "2차전지" },
-              ].map((news, i) => (
-                <button
-                  key={i}
-                  className="bg-card rounded-2xl card-shadow p-4 text-left active:scale-[0.98] transition-transform"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1">
-                      <span className="text-xs text-primary font-semibold bg-primary/8 px-2 py-0.5 rounded-md">
-                        {news.tag}
-                      </span>
-                      <p className="text-sm font-semibold text-foreground mt-1.5 leading-snug text-balance">
-                        {news.headline}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">{news.time}</p>
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-1" />
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        {/*{!searchQuery && (*/}
+        {/*  <div className="px-4 mb-4">*/}
+        {/*    <div className="flex items-center justify-between mb-3">*/}
+        {/*      <h2 className="text-base font-bold text-foreground">오늘의 시장</h2>*/}
+        {/*    </div>*/}
+        {/*    <div className="flex flex-col gap-2.5">*/}
+        {/*      {[*/}
+        {/*        { headline: "반도체 수출 전월 대비 18% 급증", time: "14분 전", tag: "반도체" },*/}
+        {/*        { headline: "미 연준, 금리 동결 시사 발언에 코스피 상승", time: "32분 전", tag: "거시경제" },*/}
+        {/*        { headline: "LG에너지솔루션, 북미 배터리 공장 증설 발표", time: "1시간 전", tag: "2차전지" },*/}
+        {/*      ].map((news, i) => (*/}
+        {/*        <button*/}
+        {/*          key={i}*/}
+        {/*          className="bg-card rounded-2xl card-shadow p-4 text-left active:scale-[0.98] transition-transform"*/}
+        {/*        >*/}
+        {/*          <div className="flex items-start justify-between gap-3">*/}
+        {/*            <div className="flex-1">*/}
+        {/*              <span className="text-xs text-primary font-semibold bg-primary/8 px-2 py-0.5 rounded-md">*/}
+        {/*                {news.tag}*/}
+        {/*              </span>*/}
+        {/*              <p className="text-sm font-semibold text-foreground mt-1.5 leading-snug text-balance">*/}
+        {/*                {news.headline}*/}
+        {/*              </p>*/}
+        {/*              <p className="text-xs text-muted-foreground mt-1">{news.time}</p>*/}
+        {/*            </div>*/}
+        {/*            <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-1" />*/}
+        {/*          </div>*/}
+        {/*        </button>*/}
+        {/*      ))}*/}
+        {/*    </div>*/}
+        {/*  </div>*/}
+        {/*)}*/}
 
         {/* Bottom padding for tab bar */}
         <div className="h-6" />

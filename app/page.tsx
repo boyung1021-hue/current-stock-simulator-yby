@@ -25,7 +25,7 @@ export default function StockApp() {
   const [cash, setCash] = useState(INITIAL_CASH)
   const [gameDate, setGameDate] = useState<Date>(new Date(GAME_START))
 
-  const { loading, priceMap, getPriceInfo } = useHistoricalData()
+  const { loading, priceMap, getPriceInfo, getIndexInfo } = useHistoricalData()
 
   // Stocks with real historical prices for the current gameDate
   const currentStocks = useMemo(() => {
@@ -134,6 +134,8 @@ export default function StockApp() {
                 cash={cash}
                 onBuy={handleBuy}
                 onSell={handleSell}
+                gameDate={gameDate}
+                getIndexInfo={getIndexInfo}
               />
             )}
           </div>
