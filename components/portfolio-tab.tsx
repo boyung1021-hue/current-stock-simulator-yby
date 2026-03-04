@@ -54,7 +54,7 @@ export function PortfolioTab({ holdings, cash, onBuy, onSell }: PortfolioTabProp
     <>
       <div className="flex flex-col min-h-0">
         {/* Header */}
-        <header className="flex items-center justify-between px-5 pt-14 pb-4 bg-background">
+        <header className="flex items-center justify-between px-5 pt-2 pb-4 bg-background">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
               <span className="text-primary-foreground text-sm font-bold">J</span>
@@ -64,12 +64,12 @@ export function PortfolioTab({ holdings, cash, onBuy, onSell }: PortfolioTabProp
               <p className="text-sm font-semibold text-foreground leading-tight mt-0.5">James Kim</p>
             </div>
           </div>
-          <button
-            className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center active:scale-95 transition-transform"
-            aria-label="알림"
-          >
-            <Bell className="w-[18px] h-[18px] text-foreground" strokeWidth={1.8} />
-          </button>
+          {/*<button*/}
+          {/*  className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center active:scale-95 transition-transform"*/}
+          {/*  aria-label="알림"*/}
+          {/*>*/}
+          {/*  <Bell className="w-[18px] h-[18px] text-foreground" strokeWidth={1.8} />*/}
+          {/*</button>*/}
         </header>
 
         {/* ── Top Summary Card ─────────────────────────── */}
@@ -109,25 +109,25 @@ export function PortfolioTab({ holdings, cash, onBuy, onSell }: PortfolioTabProp
             </div>
 
             {/* Period selector */}
-            <div className="flex gap-1 mb-3">
-              {PERIOD_TABS.map((p) => (
-                <button
-                  key={p}
-                  onClick={() => setSelectedPeriod(p)}
-                  className={cn(
-                    "px-2.5 py-1 text-[11px] font-semibold rounded-lg transition-all active:scale-95",
-                    selectedPeriod === p
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground"
-                  )}
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
+            {/*<div className="flex gap-1 mb-3">*/}
+            {/*  {PERIOD_TABS.map((p) => (*/}
+            {/*    <button*/}
+            {/*      key={p}*/}
+            {/*      onClick={() => setSelectedPeriod(p)}*/}
+            {/*      className={cn(*/}
+            {/*        "px-2.5 py-1 text-[11px] font-semibold rounded-lg transition-all active:scale-95",*/}
+            {/*        selectedPeriod === p*/}
+            {/*          ? "bg-primary text-primary-foreground"*/}
+            {/*          : "text-muted-foreground"*/}
+            {/*      )}*/}
+            {/*    >*/}
+            {/*      {p}*/}
+            {/*    </button>*/}
+            {/*  ))}*/}
+            {/*</div>*/}
 
             {/* Chart */}
-            <PortfolioChart data={PORTFOLIO_CHART_DATA} isUp={todayIsUp} />
+            {/*<PortfolioChart data={PORTFOLIO_CHART_DATA} isUp={todayIsUp} />*/}
 
             {/* 3-stat row */}
             <div className="flex gap-0 mt-4 pt-4 border-t border-border">

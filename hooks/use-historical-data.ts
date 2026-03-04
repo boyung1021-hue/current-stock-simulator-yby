@@ -1,12 +1,10 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { YAHOO_TICKERS, USD_STOCKS } from '@/lib/stocks'
+import { YAHOO_TICKERS } from '@/lib/stocks'
 
 export type DayPrice = { date: string; close: number }
 type PriceMap = Map<string, DayPrice[]>
-
-const INDEX_TICKERS = ['^KS11', '^KQ11', 'KRW=X']
 
 function dateToStr(d: Date): string {
   const y = d.getFullYear()
@@ -32,10 +30,9 @@ function binarySearch(arr: DayPrice[], target: string): number {
 export function useHistoricalData() {
   const [priceMap, setPriceMap] = useState<PriceMap>(new Map())
   const [loading, setLoading] = useState(true)
-  const [dynamicYahooTickers, setDynamicYahooTickers] = useState<Record<string, string>>({})
 
   useEffect(() => {
-    const tickers = [...Object.values(YAHOO_TICKERS), ...INDEX_TICKERS]
+    const tickers = Object.values(YAHOO_TICKERS)
 
     Promise.all(
       tickers.map(async (ticker) => {
@@ -68,8 +65,8 @@ export function useHistoricalData() {
       isUp: boolean
       sparkData: number[]
     } | null => {
-      // Look up by yahoo ticker (e.g. "005930.KS"), including dynamically added tickers
-      const yahooTicker = YAHOO_TICKERS[ticker] ?? dynamicYahooTickers[ticker]
+      // Look up by yahoo ticker (e.g. "005930.KS")
+      const yahooTicker = YAHOO_TICKERS[ticker]
       if (!yahooTicker) return null
 
       const arr = priceMap.get(yahooTicker)
@@ -82,71 +79,20 @@ export function useHistoricalData() {
       const current = arr[idx]
       const prev = idx > 0 ? arr[idx - 1] : null
 
-      // USD 종목은 당일 USD/KRW 환율로 변환
-      let usdToKrw = 1
-      if (USD_STOCKS.has(ticker)) {
-        const krwArr = priceMap.get('KRW=X')
-        if (krwArr) {
-          const krwIdx = binarySearch(krwArr, targetStr)
-          if (krwIdx >= 0) usdToKrw = krwArr[krwIdx].close
-        }
-      }
-
-      const price = Math.round(current.close * usdToKrw)
-      const prevPrice = prev ? Math.round(prev.close * usdToKrw) : null
-      const change = prevPrice != null ? price - prevPrice : 0
-      const changePct = prevPrice && prevPrice > 0 ? (change / prevPrice) * 100 : 0
+      const price = current.close
+      const change = prev ? price - prev.close : 0
+      const changePct = prev && prev.close > 0 ? (change / prev.close) * 100 : 0
       const isUp = change >= 0
 
       // sparkData: last 10 trading days up to and including current
       const sparkData = arr
         .slice(Math.max(0, idx - 9), idx + 1)
-        .map((d) => Math.round(d.close * usdToKrw))
+        .map((d) => d.close)
 
       return { price, change, changePct, isUp, sparkData }
     },
     [priceMap]
   )
 
-  const getIndexInfo = useCallback(
-    (yahooTicker: string, date: Date): {
-      value: number
-      change: number
-      changePct: number
-      isUp: boolean
-    } | null => {
-      const arr = priceMap.get(yahooTicker)
-      if (!arr || arr.length === 0) return null
-
-      const targetStr = dateToStr(date)
-      const idx = binarySearch(arr, targetStr)
-      if (idx < 0) return null
-
-      const current = arr[idx]
-      const prev = idx > 0 ? arr[idx - 1] : null
-
-      const value = current.close
-      const change = prev ? value - prev.close : 0
-      const changePct = prev && prev.close > 0 ? (change / prev.close) * 100 : 0
-      const isUp = change >= 0
-
-      return { value, change, changePct, isUp }
-    },
-    [priceMap, dynamicYahooTickers]
-  )
-
-  function addExtraTicker(ticker: string, yahooTicker: string) {
-    if (YAHOO_TICKERS[ticker] || dynamicYahooTickers[ticker]) return
-    setDynamicYahooTickers((prev) => ({ ...prev, [ticker]: yahooTicker }))
-    fetch(`/api/stock-history?ticker=${yahooTicker}`)
-      .then((res) => (res.ok ? res.json() : []))
-      .then((data: DayPrice[]) => {
-        if (Array.isArray(data) && data.length > 0) {
-          setPriceMap((prev) => new Map(prev).set(yahooTicker, data))
-        }
-      })
-      .catch(() => {})
-  }
-
-  return { loading, priceMap, getPriceInfo, getIndexInfo, addExtraTicker }
+  return { loading, priceMap, getPriceInfo }
 }
