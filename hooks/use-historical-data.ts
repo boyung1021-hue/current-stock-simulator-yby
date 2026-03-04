@@ -6,6 +6,8 @@ import { YAHOO_TICKERS } from '@/lib/stocks'
 export type DayPrice = { date: string; close: number }
 type PriceMap = Map<string, DayPrice[]>
 
+const INDEX_TICKERS = ['^KS11', '^KQ11', 'KRW=X']
+
 function dateToStr(d: Date): string {
   const y = d.getFullYear()
   const m = String(d.getMonth() + 1).padStart(2, '0')
@@ -32,7 +34,7 @@ export function useHistoricalData() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const tickers = Object.values(YAHOO_TICKERS)
+    const tickers = [...Object.values(YAHOO_TICKERS), ...INDEX_TICKERS]
 
     Promise.all(
       tickers.map(async (ticker) => {
@@ -94,5 +96,32 @@ export function useHistoricalData() {
     [priceMap]
   )
 
-  return { loading, priceMap, getPriceInfo }
+  const getIndexInfo = useCallback(
+    (yahooTicker: string, date: Date): {
+      value: number
+      change: number
+      changePct: number
+      isUp: boolean
+    } | null => {
+      const arr = priceMap.get(yahooTicker)
+      if (!arr || arr.length === 0) return null
+
+      const targetStr = dateToStr(date)
+      const idx = binarySearch(arr, targetStr)
+      if (idx < 0) return null
+
+      const current = arr[idx]
+      const prev = idx > 0 ? arr[idx - 1] : null
+
+      const value = current.close
+      const change = prev ? value - prev.close : 0
+      const changePct = prev && prev.close > 0 ? (change / prev.close) * 100 : 0
+      const isUp = change >= 0
+
+      return { value, change, changePct, isUp }
+    },
+    [priceMap]
+  )
+
+  return { loading, priceMap, getPriceInfo, getIndexInfo }
 }
