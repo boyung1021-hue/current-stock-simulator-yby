@@ -26,6 +26,7 @@ export default function StockApp() {
   const [gameDate, setGameDate] = useState<Date>(new Date(GAME_START))
   const [autoAdvancing, setAutoAdvancing] = useState(true)
   const [countdown, setCountdown] = useState(30)
+  const [portfolioHistory, setPortfolioHistory] = useState<number[]>([])
   const isAtEnd = gameDate >= GAME_END
 
   // 30초마다 1년 자동 진행
@@ -45,6 +46,13 @@ export default function StockApp() {
 
   // 날짜가 수동으로 바뀌면 카운트다운 리셋
   useEffect(() => { setCountdown(30) }, [gameDate])
+
+  // 날짜가 바뀔 때마다 포트폴리오 총 자산 이력 기록
+  useEffect(() => {
+    const stockVal = currentHoldings.reduce((sum, h) => sum + h.price * h.shares, 0)
+    setPortfolioHistory((prev) => [...prev, stockVal + cash])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameDate])
 
   const { loading, priceMap, getPriceInfo, getIndexInfo, addExtraTicker } = useHistoricalData()
   const [extraStocks, setExtraStocks] = useState<import("@/lib/stocks").Stock[]>([])
@@ -151,6 +159,7 @@ export default function StockApp() {
               <PortfolioTab
                 holdings={currentHoldings}
                 cash={cash}
+                assetHistory={portfolioHistory}
                 onBuy={handleBuy}
                 onSell={handleSell}
               />
