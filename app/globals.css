@@ -140,7 +140,23 @@
   }
 }
 
+/* ── Micro-animation keyframes ──────────────────────── */
+@keyframes slideInUp {
+  from { opacity: 0.15; transform: translateY(28%); }
+  to   { opacity: 1;    transform: translateY(0);   }
+}
+@keyframes slideInDown {
+  from { opacity: 0.15; transform: translateY(-28%); }
+  to   { opacity: 1;    transform: translateY(0);    }
+}
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 8px 1px oklch(0.52 0.22 260 / 0.40); }
+  50%       { box-shadow: 0 0 18px 5px oklch(0.52 0.22 260 / 0.72); }
+}
+
 @layer utilities {
+  .anim-slide-up   { animation: slideInUp   0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+  .anim-slide-down { animation: slideInDown 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
   .stock-up {
     color: var(--stock-up);
   }

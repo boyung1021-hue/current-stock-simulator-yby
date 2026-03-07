@@ -94,10 +94,11 @@ export function DateNavigator({
             <div className="relative h-[6px] bg-secondary rounded-full">
               {/* Gradient fill */}
               <div
-                className="absolute inset-y-0 left-0 rounded-full transition-all duration-300"
+                className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-300"
                 style={{
                   width: `${progress}%`,
                   background: 'linear-gradient(90deg, oklch(0.45 0.22 260), oklch(0.62 0.24 285))',
+                  animation: autoAdvancing ? 'pulseGlow 2s ease-in-out infinite' : 'none',
                   boxShadow: '0 0 8px 1px oklch(0.52 0.22 260 / 0.45)',
                 }}
               />
