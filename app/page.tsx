@@ -1,151 +1,186 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, useCallback } from "react"
 import { BottomNav } from "@/components/bottom-nav"
 import { PortfolioTab } from "@/components/portfolio-tab"
 import { DiscoverTab } from "@/components/discover-tab"
-import { DateNavigator } from "@/components/date-navigator"
+import { LastUpdatedBar } from "@/components/last-updated-bar"
 import { cn } from "@/lib/utils"
-import { ALL_STOCKS, INITIAL_HOLDINGS, INITIAL_CASH, type Holding } from "@/lib/stocks"
-import { GAME_START, GAME_END, clamp, nextTradingDay, advanceWeek, advanceMonth, advanceYear, toTradingDay } from "@/lib/game-date"
+import { ALL_STOCKS, type Holding, type Stock } from "@/lib/stocks"
 import { useHistoricalData } from "@/hooks/use-historical-data"
-
-type AdvanceType = 'day' | 'week' | 'month' | 'year'
-
-const advanceFns = {
-  day:   nextTradingDay,
-  week:  advanceWeek,
-  month: advanceMonth,
-  year:  advanceYear,
-}
+import {
+  loadHoldings, loadCash, loadAssetHistory,
+  saveHoldings, saveCash, saveAssetHistory,
+  INITIAL_CASH, type StoredHolding,
+} from "@/lib/local-storage"
 
 export default function StockApp() {
   const [activeTab, setActiveTab] = useState<"portfolio" | "discover">("portfolio")
-  const [holdings, setHoldings] = useState<Holding[]>(INITIAL_HOLDINGS)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+
+  // ── Persistent state from localStorage ─────────────────────────────
+  const [storedHoldings, setStoredHoldings] = useState<StoredHolding[]>([])
   const [cash, setCash] = useState(INITIAL_CASH)
-  const [gameDate, setGameDate] = useState<Date>(new Date(GAME_START))
-  const [autoAdvancing, setAutoAdvancing] = useState(true)
-  const [countdown, setCountdown] = useState(30)
-  const [portfolioHistory, setPortfolioHistory] = useState<number[]>([])
-  const isAtEnd = gameDate >= GAME_END
+  const [assetHistory, setAssetHistory] = useState<number[]>([])
 
-  // 30초마다 1년 자동 진행
+  // Load from localStorage on mount (client only)
   useEffect(() => {
-    if (!autoAdvancing || isAtEnd) return
-    const id = setInterval(() => {
-      setCountdown((c) => {
-        if (c <= 1) {
-          setGameDate((prev) => clamp(advanceYear(prev)))
-          return 30
-        }
-        return c - 1
-      })
-    }, 1000)
-    return () => clearInterval(id)
-  }, [autoAdvancing, isAtEnd])
+    setStoredHoldings(loadHoldings())
+    setCash(loadCash())
+    setAssetHistory(loadAssetHistory())
+  }, [])
 
-  // 날짜가 수동으로 바뀌면 카운트다운 리셋
-  useEffect(() => { setCountdown(30) }, [gameDate])
-
-  // 날짜가 바뀔 때마다 포트폴리오 총 자산 이력 기록
-  useEffect(() => {
-    const stockVal = currentHoldings.reduce((sum, h) => sum + h.price * h.shares, 0)
-    setPortfolioHistory((prev) => [...prev, stockVal + cash])
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gameDate])
+  // ── Real-time price data ────────────────────────────────────────────
+  const today = useMemo(() => new Date(), [])
 
   const { loading, priceMap, getPriceInfo, getIndexInfo, addExtraTicker } = useHistoricalData()
-  const [extraStocks, setExtraStocks] = useState<import("@/lib/stocks").Stock[]>([])
 
-  function handleAddExtraStock(stock: import("@/lib/stocks").Stock, yahooTicker: string) {
+  const [extraStocks, setExtraStocks] = useState<Stock[]>([])
+
+  function handleAddExtraStock(stock: Stock, yahooTicker: string) {
     setExtraStocks((prev) => prev.some((s) => s.ticker === stock.ticker) ? prev : [...prev, stock])
     addExtraTicker(stock.ticker, yahooTicker)
   }
 
   const allStocksWithExtra = useMemo(() => [...ALL_STOCKS, ...extraStocks], [extraStocks])
 
-  // Stocks with real historical prices for the current gameDate
+  // Stocks with real historical prices for today
   const currentStocks = useMemo(() => {
     return allStocksWithExtra.map((s) => {
-      const info = getPriceInfo(s.ticker, gameDate)
+      const info = getPriceInfo(s.ticker, today)
       return info ? { ...s, ...info } : s
     })
-  }, [gameDate, priceMap, getPriceInfo, allStocksWithExtra])
+  }, [today, priceMap, getPriceInfo, allStocksWithExtra])
 
-  // Holdings with updated market prices
-  const currentHoldings = useMemo(() => {
-    return holdings.map((h) => {
+  // Convert StoredHoldings → Holding[] with live prices
+  const currentHoldings = useMemo<Holding[]>(() => {
+    return storedHoldings.map((h) => {
       const stock = currentStocks.find((s) => s.ticker === h.ticker)
-      return stock
-        ? { ...h, price: stock.price, change: stock.change, changePct: stock.changePct, isUp: stock.isUp }
-        : h
+      const base: Holding = {
+        id: h.ticker.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0),
+        ticker: h.ticker,
+        name: h.name,
+        nameKr: h.nameKr,
+        logoColor: h.logoColor,
+        initial: h.initial,
+        shares: h.shares,
+        avgPrice: h.avgPrice,
+        price: 0,
+        change: 0,
+        changePct: 0,
+        isUp: true,
+        sparkData: [],
+        chartData: [],
+        high52w: 0,
+        low52w: 0,
+        marketCap: "---",
+        per: "---",
+        pbr: "---",
+      }
+      if (stock) {
+        return { ...base, price: stock.price, change: stock.change, changePct: stock.changePct, isUp: stock.isUp, sparkData: stock.sparkData }
+      }
+      return base
     })
-  }, [holdings, currentStocks])
+  }, [storedHoldings, currentStocks])
 
-  function handleAdvance(type: AdvanceType) {
-    setGameDate((prev) => clamp(advanceFns[type](prev)))
-  }
+  // Mark lastUpdated when loading completes
+  useEffect(() => {
+    if (!loading) setLastUpdated(new Date())
+  }, [loading])
 
-  function handleJump(date: Date) {
-    const next = clamp(toTradingDay(date))
-    if (next <= gameDate) return  // 과거로 이동 불가
-    setGameDate(next)
-  }
+  // Track total asset value history whenever prices update
+  useEffect(() => {
+    if (loading) return
+    const stockVal = currentHoldings.reduce((sum, h) => sum + h.price * h.shares, 0)
+    const total = stockVal + cash
+    setAssetHistory((prev) => {
+      const next = [...prev, total]
+      saveAssetHistory(next)
+      return next
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading])
 
+  // Refresh: re-fetch by remounting the hook is tricky, so we just update timestamp
+  const handleRefresh = useCallback(() => {
+    window.location.reload()
+  }, [])
+
+  // ── Trade handlers ──────────────────────────────────────────────────
   function handleBuy(ticker: string, quantity: number, price: number) {
     const total = quantity * price
-    setCash((prev) => prev - total)
-    setHoldings((prev) => {
+    const newCash = cash - total
+    setCash(newCash)
+    saveCash(newCash)
+
+    setStoredHoldings((prev) => {
       const existing = prev.find((h) => h.ticker === ticker)
+      let next: StoredHolding[]
       if (existing) {
         const newShares = existing.shares + quantity
         const newAvgPrice = Math.round(
           (existing.avgPrice * existing.shares + price * quantity) / newShares
         )
-        return prev.map((h) =>
+        next = prev.map((h) =>
           h.ticker === ticker ? { ...h, shares: newShares, avgPrice: newAvgPrice } : h
         )
+      } else {
+        const stock = currentStocks.find((s) => s.ticker === ticker)!
+        const yahooTicker = extraStocks.find((s) => s.ticker === ticker)
+          ? ticker  // fallback
+          : ticker
+        next = [...prev, {
+          ticker,
+          yahooTicker: yahooTicker,
+          nameKr: stock.nameKr,
+          name: stock.name,
+          shares: quantity,
+          avgPrice: price,
+          logoColor: stock.logoColor,
+          initial: stock.initial,
+        }]
       }
-      const stock = currentStocks.find((s) => s.ticker === ticker)!
-      return [...prev, { ...stock, shares: quantity, avgPrice: price }]
+      saveHoldings(next)
+      return next
     })
   }
 
   function handleSell(ticker: string, quantity: number, price: number) {
     const total = quantity * price
-    setCash((prev) => prev + total)
-    setHoldings((prev) =>
-      prev
+    const newCash = cash + total
+    setCash(newCash)
+    saveCash(newCash)
+
+    setStoredHoldings((prev) => {
+      const next = prev
         .map((h) => {
           if (h.ticker !== ticker) return h
           const newShares = h.shares - quantity
           return newShares <= 0 ? null : { ...h, shares: newShares }
         })
-        .filter(Boolean) as Holding[]
-    )
+        .filter(Boolean) as StoredHolding[]
+      saveHoldings(next)
+      return next
+    })
   }
 
   return (
     <main className="min-h-screen bg-background flex justify-center">
-      {/* Phone frame wrapper */}
       <div className="relative w-full max-w-sm min-h-screen flex flex-col">
-        {/* Fixed date navigator */}
-        <DateNavigator
-          gameDate={gameDate}
-          onAdvance={handleAdvance}
-          onJump={handleJump}
+        {/* Fixed header */}
+        <LastUpdatedBar
+          lastUpdated={lastUpdated}
           loading={loading}
-          countdown={countdown}
-          autoAdvancing={autoAdvancing}
-          onToggleAutoAdvance={() => setAutoAdvancing((v) => !v)}
+          onRefresh={handleRefresh}
         />
 
         {/* Scrollable content area */}
         <div
-          className={cn("flex-1 overflow-y-auto pb-24 pt-[240px]", "scrollbar-hide")}
+          className={cn("flex-1 overflow-y-auto pb-24 pt-[104px]", "scrollbar-hide")}
           style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
         >
-          {/* Animated tab panels */}
+          {/* Portfolio tab */}
           <div
             className={cn(
               "transition-all duration-300",
@@ -159,13 +194,14 @@ export default function StockApp() {
               <PortfolioTab
                 holdings={currentHoldings}
                 cash={cash}
-                assetHistory={portfolioHistory}
+                assetHistory={assetHistory}
                 onBuy={handleBuy}
                 onSell={handleSell}
               />
             )}
           </div>
 
+          {/* Discover tab */}
           <div
             className={cn(
               "transition-all duration-300",
@@ -182,8 +218,8 @@ export default function StockApp() {
                 cash={cash}
                 onBuy={handleBuy}
                 onSell={handleSell}
-                gameDate={gameDate}
                 getIndexInfo={getIndexInfo}
+                today={today}
                 onAddExtraStock={handleAddExtraStock}
               />
             )}

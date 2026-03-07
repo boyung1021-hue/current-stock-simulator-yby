@@ -66,20 +66,21 @@ interface DiscoverTabProps {
   cash: number
   onBuy: (ticker: string, quantity: number, price: number) => void
   onSell: (ticker: string, quantity: number, price: number) => void
-  gameDate: Date
+  today: Date
   getIndexInfo: (yahooTicker: string, date: Date) => IndexInfo | null
   onAddExtraStock: (stock: Stock, yahooTicker: string) => void
 }
 
-export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell, gameDate, getIndexInfo, onAddExtraStock }: DiscoverTabProps) {
+export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell, today, getIndexInfo, onAddExtraStock }: DiscoverTabProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [marketTab, setMarketTab] = useState("전체")
   const [selectedStock, setSelectedStock] = useState<Stock | null>(null)
+  const [selectedYahooTicker, setSelectedYahooTicker] = useState<string | undefined>()
 
   const marketIndices = useMemo(() => {
-    const kospi = getIndexInfo('^KS11', gameDate)
-    const kosdaq = getIndexInfo('^KQ11', gameDate)
-    const usdkrw = getIndexInfo('KRW=X', gameDate)
+    const kospi = getIndexInfo('^KS11', today)
+    const kosdaq = getIndexInfo('^KQ11', today)
+    const usdkrw = getIndexInfo('KRW=X', today)
 
     return [
       {
@@ -104,7 +105,7 @@ export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell, gameDate
         isUp: usdkrw?.isUp ?? true,
       },
     ]
-  }, [gameDate, getIndexInfo])
+  }, [today, getIndexInfo])
 
   // Only show ranked stocks (those with a rank) in the hot list, unless searching
   const rankedStocks = allStocks.filter((s) => STOCK_RANKS[s.ticker])
@@ -137,11 +138,11 @@ export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell, gameDate
   const [leverageLoading, setLeverageLoading] = useState(false)
 
   const dateStr = useMemo(() => {
-    const y = gameDate.getFullYear()
-    const m = String(gameDate.getMonth() + 1).padStart(2, '0')
-    const d = String(gameDate.getDate()).padStart(2, '0')
+    const y = today.getFullYear()
+    const m = String(today.getMonth() + 1).padStart(2, '0')
+    const d = String(today.getDate()).padStart(2, '0')
     return `${y}-${m}-${d}`
-  }, [gameDate])
+  }, [today])
 
   useEffect(() => {
     setLeverageLoading(true)
@@ -207,13 +208,14 @@ export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell, gameDate
       pbr: "---",
     }
     onAddExtraStock(stock, s.ticker)
+    setSelectedYahooTicker(s.ticker)
     setSelectedStock(stock)
   }
 
   function handleExtraResultClick(result: KoreanStock) {
     if (priceLoading) return
     const priceInfo = extraPrices.get(result.ticker)
-    const yahooTicker = result.exchange === "KOSPI" ? `${result.ticker}.KS` : result.exchange === "KOSDAQ" ? `${result.ticker}.KQ` : result.ticker
+    const yt = result.exchange === "KOSPI" ? `${result.ticker}.KS` : result.exchange === "KOSDAQ" ? `${result.ticker}.KQ` : result.ticker
     const stock: Stock = {
       id: result.ticker.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0),
       ticker: result.ticker,
@@ -233,7 +235,8 @@ export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell, gameDate
       per: "---",
       pbr: "---",
     }
-    onAddExtraStock(stock, yahooTicker)
+    onAddExtraStock(stock, yt)
+    setSelectedYahooTicker(yt)
     setSelectedStock(stock)
   }
 
@@ -356,7 +359,7 @@ export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell, gameDate
                 return (
                   <button
                     key={stock.id}
-                    onClick={() => setSelectedStock(stock)}
+                    onClick={() => { setSelectedYahooTicker(undefined); setSelectedStock(stock) }}
                     className={cn(
                       "w-full px-4 py-3.5 flex items-center gap-3 active:bg-secondary transition-colors",
                       index < filteredStocks.length - 1 && "border-b border-border"
@@ -577,9 +580,10 @@ export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell, gameDate
           stock={selectedStock}
           holding={selectedHolding ? { shares: selectedHolding.shares, avgPrice: selectedHolding.avgPrice } : undefined}
           cash={cash}
+          yahooTicker={selectedYahooTicker}
           onBuy={onBuy}
           onSell={onSell}
-          onClose={() => setSelectedStock(null)}
+          onClose={() => { setSelectedStock(null); setSelectedYahooTicker(undefined) }}
         />
       )}
     </>
