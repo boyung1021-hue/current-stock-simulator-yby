@@ -200,6 +200,7 @@ export default function StockApp() {
                 assetHistory={assetHistory}
                 onBuy={handleBuy}
                 onSell={handleSell}
+                onGoToDiscover={() => setActiveTab("discover")}
               />
             )}
           </div>
