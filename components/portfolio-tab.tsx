@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils"
 import { StockDetailSheet } from "@/components/stock-detail-sheet"
 import type { Holding } from "@/lib/stocks"
 
-// ── useCountUp ─────────────────────────────────────────────
+//  ── useCountUp ─────────────────────────────────────────────
 function useCountUp(target: number, duration = 260) {
   const [displayed, setDisplayed] = useState(target)
   const fromRef = useRef(target)
