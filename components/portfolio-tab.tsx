@@ -1,10 +1,55 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Eye, EyeOff, TrendingUp, TrendingDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { StockDetailSheet } from "@/components/stock-detail-sheet"
 import type { Holding } from "@/lib/stocks"
+
+// ── useCountUp: eased integer animation ───────────────────
+function useCountUp(target: number, duration = 260) {
+  const [displayed, setDisplayed] = useState(target)
+  const fromRef = useRef(target)
+  const rafRef = useRef<number>(0)
+  const mountedRef = useRef(false)
+
+  useEffect(() => {
+    if (!mountedRef.current) { mountedRef.current = true; return }
+    cancelAnimationFrame(rafRef.current)
+    const from = fromRef.current
+    const startTime = performance.now()
+    const tick = (now: number) => {
+      const t = Math.min((now - startTime) / duration, 1)
+      const eased = 1 - Math.pow(1 - t, 3)
+      const next = Math.round(from + (target - from) * eased)
+      setDisplayed(next)
+      if (t < 1) { rafRef.current = requestAnimationFrame(tick) }
+      else { fromRef.current = target }
+    }
+    rafRef.current = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(rafRef.current)
+  }, [target, duration])
+
+  return displayed
+}
+
+// ── useSlide: slide-in direction on value change ──────────
+function useSlide(value: number) {
+  const prevRef = useRef(value)
+  const mountedRef = useRef(false)
+  const [animKey, setAnimKey] = useState(0)
+  const [slideClass, setSlideClass] = useState("")
+
+  useEffect(() => {
+    if (!mountedRef.current) { mountedRef.current = true; return }
+    if (prevRef.current === value) return
+    setSlideClass(value > prevRef.current ? "anim-slide-up" : "anim-slide-down")
+    setAnimKey(k => k + 1)
+    prevRef.current = value
+  }, [value])
+
+  return { animKey, slideClass }
+}
 
 // ── SVG Sparkline ─────────────────────────────────────────
 function Sparkline({ data, isUp }: { data: number[]; isUp: boolean }) {
@@ -76,6 +121,12 @@ export function PortfolioTab({ holdings, cash, assetHistory, onBuy, onSell }: Po
   const todayGain = holdings.reduce((sum, h) => sum + h.change * h.shares, 0)
   const todayIsUp = todayGain >= 0
 
+  // Animated display values
+  const animTotalValue = useCountUp(totalValue)
+  const animStockValue = useCountUp(stockValue)
+  const animTodayGain  = useCountUp(todayGain)
+  const { animKey: pctKey, slideClass: pctSlide } = useSlide(totalGainPct)
+
   const mask = (val: string) => (hideBalance ? "•••••" : val)
   const hasHoldings = holdings.length > 0
 
@@ -113,26 +164,32 @@ export function PortfolioTab({ holdings, cash, assetHistory, onBuy, onSell }: Po
                 </button>
               </div>
 
-              {/* 수익률 — hero number */}
-              <div className={cn(
-                "text-[42px] font-extrabold leading-none tracking-tight",
-                hasHoldings ? (isTotalUp ? "stock-up" : "stock-down") : "text-muted-foreground"
-              )}>
-                {hideBalance
-                  ? "•••%"
-                  : hasHoldings
-                    ? `${isTotalUp ? "+" : ""}${totalGainPct.toFixed(2)}%`
-                    : "0.00%"}
+              {/* 수익률 — hero number (slide animation on change) */}
+              <div className="overflow-hidden">
+                <div
+                  key={pctKey}
+                  className={cn(
+                    "text-[42px] font-extrabold leading-none tracking-tight",
+                    pctSlide,
+                    hasHoldings ? (isTotalUp ? "stock-up" : "stock-down") : "text-muted-foreground"
+                  )}
+                >
+                  {hideBalance
+                    ? "•••%"
+                    : hasHoldings
+                      ? `${isTotalUp ? "+" : ""}${totalGainPct.toFixed(2)}%`
+                      : "0.00%"}
+                </div>
               </div>
               <p className="text-[11px] text-muted-foreground mt-1.5 mb-5">수익률</p>
 
-              {/* 총 평가금액 */}
-              <p className="text-[20px] font-bold text-foreground leading-none tracking-tight">
-                {hideBalance ? "•••••••" : `₩${totalValue.toLocaleString()}`}
+              {/* 총 평가금액 (count-up) */}
+              <p className="text-[20px] font-bold text-foreground leading-none tracking-tight tabular-nums">
+                {hideBalance ? "•••••••" : `₩${animTotalValue.toLocaleString()}`}
               </p>
               <p className="text-[11px] text-muted-foreground mt-1.5 mb-4">총 평가금액</p>
 
-              {/* Today's change pill */}
+              {/* Today's change pill (count-up) */}
               <div className={cn(
                 "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full",
                 hasHoldings
@@ -145,13 +202,13 @@ export function PortfolioTab({ holdings, cash, assetHistory, onBuy, onSell }: Po
                     : <TrendingDown className="w-3 h-3 stock-down" strokeWidth={2.5} />
                 )}
                 <span className={cn(
-                  "text-[11px] font-bold",
+                  "text-[11px] font-bold tabular-nums",
                   hasHoldings ? (todayIsUp ? "stock-up" : "stock-down") : "text-muted-foreground"
                 )}>
                   {hideBalance
                     ? "•••"
                     : hasHoldings
-                      ? `${todayIsUp ? "+" : ""}₩${todayGain.toLocaleString()}`
+                      ? `${todayIsUp ? "+" : ""}₩${animTodayGain.toLocaleString()}`
                       : "₩0"}
                 </span>
                 <span className="text-[10px] text-muted-foreground">오늘</span>
@@ -179,7 +236,7 @@ export function PortfolioTab({ holdings, cash, assetHistory, onBuy, onSell }: Po
                     "text-[13px] font-bold tabular-nums",
                     hasHoldings ? (isTotalUp ? "stock-up" : "stock-down") : "text-foreground"
                   )}>
-                    {mask(`₩${stockValue.toLocaleString()}`)}
+                    {mask(`₩${animStockValue.toLocaleString()}`)}
                   </p>
                 </div>
               </div>
