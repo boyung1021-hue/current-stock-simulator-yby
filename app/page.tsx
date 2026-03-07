@@ -142,7 +142,7 @@ export default function StockApp() {
 
         {/* Scrollable content area */}
         <div
-          className={cn("flex-1 overflow-y-auto pb-24 pt-36", "scrollbar-hide")}
+          className={cn("flex-1 overflow-y-auto pb-24 pt-[240px]", "scrollbar-hide")}
           style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
         >
           {/* Animated tab panels */}

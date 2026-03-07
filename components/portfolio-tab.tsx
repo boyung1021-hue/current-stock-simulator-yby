@@ -98,10 +98,10 @@ export function PortfolioTab({ holdings, cash, assetHistory, onBuy, onSell }: Po
         {/* ── Top Summary Card ──────────────────────────── */}
         <div className="mx-4 mb-4">
           <div className="bg-card rounded-2xl card-shadow overflow-hidden">
-            <div className="p-5 pb-4">
+            <div className="px-5 pt-5 pb-4">
               {/* Row: label + eye toggle */}
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-[11px] text-muted-foreground font-medium">내 포트폴리오</p>
+              <div className="flex items-center justify-between mb-5">
+                <p className="text-[11px] text-muted-foreground font-medium tracking-wide uppercase">내 포트폴리오</p>
                 <button
                   onClick={() => setHideBalance(!hideBalance)}
                   className="text-muted-foreground active:scale-95 transition-transform"
@@ -115,7 +115,7 @@ export function PortfolioTab({ holdings, cash, assetHistory, onBuy, onSell }: Po
 
               {/* 수익률 — hero number */}
               <div className={cn(
-                "text-[40px] font-extrabold leading-none tracking-tight mb-1",
+                "text-[42px] font-extrabold leading-none tracking-tight",
                 hasHoldings ? (isTotalUp ? "stock-up" : "stock-down") : "text-muted-foreground"
               )}>
                 {hideBalance
@@ -124,13 +124,13 @@ export function PortfolioTab({ holdings, cash, assetHistory, onBuy, onSell }: Po
                     ? `${isTotalUp ? "+" : ""}${totalGainPct.toFixed(2)}%`
                     : "0.00%"}
               </div>
-              <p className="text-[11px] text-muted-foreground mb-3">수익률</p>
+              <p className="text-[11px] text-muted-foreground mt-1.5 mb-5">수익률</p>
 
               {/* 총 평가금액 */}
-              <p className="text-[22px] font-bold text-foreground leading-none tracking-tight">
+              <p className="text-[20px] font-bold text-foreground leading-none tracking-tight">
                 {hideBalance ? "•••••••" : `₩${totalValue.toLocaleString()}`}
               </p>
-              <p className="text-[11px] text-muted-foreground mt-0.5 mb-3">총 평가금액</p>
+              <p className="text-[11px] text-muted-foreground mt-1.5 mb-4">총 평가금액</p>
 
               {/* Today's change pill */}
               <div className={cn(
@@ -158,23 +158,23 @@ export function PortfolioTab({ holdings, cash, assetHistory, onBuy, onSell }: Po
               </div>
 
               {/* 3-stat row: 예수금 / 투자금 / 평가금액 */}
-              <div className="flex gap-0 mt-4 pt-4 border-t border-border">
+              <div className="flex mt-5 pt-4 border-t border-border">
                 <div className="flex-1">
-                  <p className="text-[10px] text-muted-foreground mb-1">예수금</p>
+                  <p className="text-[10px] text-muted-foreground mb-1.5">예수금</p>
                   <p className="text-[13px] font-bold text-foreground tabular-nums">
                     {mask(`₩${cash.toLocaleString()}`)}
                   </p>
                 </div>
-                <div className="w-px bg-border mx-1 self-stretch" />
-                <div className="flex-1 pl-3">
-                  <p className="text-[10px] text-muted-foreground mb-1">투자금</p>
+                <div className="w-px bg-border self-stretch mx-3" />
+                <div className="flex-1">
+                  <p className="text-[10px] text-muted-foreground mb-1.5">투자금</p>
                   <p className="text-[13px] font-bold text-foreground tabular-nums">
                     {mask(`₩${totalInvested.toLocaleString()}`)}
                   </p>
                 </div>
-                <div className="w-px bg-border mx-1 self-stretch" />
-                <div className="flex-1 pl-3">
-                  <p className="text-[10px] text-muted-foreground mb-1">평가금액</p>
+                <div className="w-px bg-border self-stretch mx-3" />
+                <div className="flex-1">
+                  <p className="text-[10px] text-muted-foreground mb-1.5">평가금액</p>
                   <p className={cn(
                     "text-[13px] font-bold tabular-nums",
                     hasHoldings ? (isTotalUp ? "stock-up" : "stock-down") : "text-foreground"
