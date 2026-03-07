@@ -248,7 +248,7 @@ export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell, today, g
     <>
       <div className="flex flex-col min-h-0">
         {/* Header */}
-        <header className="px-5 pt-2 pb-4 bg-background">
+        <header className="px-5 pt-5 pb-4 bg-background">
           <h1 className="text-xl font-bold text-foreground mb-4">탐색</h1>
 
           {/* Search */}

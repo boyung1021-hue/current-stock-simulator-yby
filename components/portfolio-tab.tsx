@@ -134,7 +134,7 @@ export function PortfolioTab({ holdings, cash, assetHistory, onBuy, onSell }: Po
     <>
       <div className="flex flex-col min-h-0">
         {/* ── Header ────────────────────────────────────── */}
-        <header className="flex items-center justify-between px-5 pt-2 pb-4 bg-background">
+        <header className="flex items-center justify-between px-5 pt-5 pb-4 bg-background">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
               <span className="text-primary-foreground text-sm font-bold">J</span>

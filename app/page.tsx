@@ -2,8 +2,11 @@
 
 import { useState, useMemo, useEffect, useCallback } from "react"
 import { BottomNav } from "@/components/bottom-nav"
+
+type TabId = "portfolio" | "discover" | "ranking"
 import { PortfolioTab } from "@/components/portfolio-tab"
 import { DiscoverTab } from "@/components/discover-tab"
+import { RankingTab } from "@/components/ranking-tab"
 import { LastUpdatedBar } from "@/components/last-updated-bar"
 import { cn } from "@/lib/utils"
 import { ALL_STOCKS, type Holding, type Stock } from "@/lib/stocks"
@@ -15,7 +18,7 @@ import {
 } from "@/lib/local-storage"
 
 export default function StockApp() {
-  const [activeTab, setActiveTab] = useState<"portfolio" | "discover">("portfolio")
+  const [activeTab, setActiveTab] = useState<TabId>("portfolio")
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
 
   // ── Persistent state from localStorage ─────────────────────────────
@@ -177,7 +180,7 @@ export default function StockApp() {
 
         {/* Scrollable content area */}
         <div
-          className={cn("flex-1 overflow-y-auto pb-24 pt-[104px]", "scrollbar-hide")}
+          className={cn("flex-1 overflow-y-auto pb-24 pt-[120px]", "scrollbar-hide")}
           style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
         >
           {/* Portfolio tab */}
@@ -223,6 +226,19 @@ export default function StockApp() {
                 onAddExtraStock={handleAddExtraStock}
               />
             )}
+          </div>
+
+          {/* Ranking tab */}
+          <div
+            className={cn(
+              "transition-all duration-300",
+              activeTab === "ranking"
+                ? "opacity-100 translate-y-0"
+                : "opacity-0 translate-y-2 pointer-events-none absolute inset-0"
+            )}
+            aria-hidden={activeTab !== "ranking"}
+          >
+            {activeTab === "ranking" && <RankingTab />}
           </div>
         </div>
 
