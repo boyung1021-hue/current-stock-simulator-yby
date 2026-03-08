@@ -7,6 +7,7 @@ import { StockDetailSheet } from "@/components/stock-detail-sheet"
 import { cn } from "@/lib/utils"
 import type { Stock, Holding } from "@/lib/stocks"
 import { searchStocks, type KoreanStock } from "@/lib/korean-stock-db"
+import type { PriceInfo } from "@/hooks/use-real-prices"
 
 function fmtValue(n: number, decimals: number): string {
   return n.toLocaleString("ko-KR", { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
@@ -32,7 +33,6 @@ const STOCK_RANKS: Record<string, { rank: number; volume: string }> = {
   "051910": { rank: 7, volume: "2.1M" },
 }
 
-
 const LEVERAGE_STOCKS = [
   { ticker: 'TQQQ', name: 'ProShares UltraPro QQQ' },
   { ticker: 'SOXL', name: 'Direxion Daily Semi Bull 3X' },
@@ -41,14 +41,7 @@ const LEVERAGE_STOCKS = [
 
 type ExtraPrice = { price: number; change: number; changePct: number; isUp: boolean } | null
 
-const MARKET_TABS = ["전체", "상승", "하락", "거래량"]
-
-interface IndexInfo {
-  value: number
-  change: number
-  changePct: number
-  isUp: boolean
-}
+const MARKET_TABS = ["전체", "상승", "하락"]
 
 const EXTRA_LOGO_COLORS = [
   "bg-blue-400", "bg-purple-500", "bg-teal-500", "bg-orange-400",
@@ -66,47 +59,45 @@ interface DiscoverTabProps {
   cash: number
   onBuy: (ticker: string, quantity: number, price: number) => void
   onSell: (ticker: string, quantity: number, price: number) => void
-  gameDate: Date
-  getIndexInfo: (yahooTicker: string, date: Date) => IndexInfo | null
+  getIndexInfo: (yahooTicker: string) => PriceInfo | null
   onAddExtraStock: (stock: Stock, yahooTicker: string) => void
 }
 
-export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell, gameDate, getIndexInfo, onAddExtraStock }: DiscoverTabProps) {
+export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell, getIndexInfo, onAddExtraStock }: DiscoverTabProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [marketTab, setMarketTab] = useState("전체")
   const [selectedStock, setSelectedStock] = useState<Stock | null>(null)
 
   const marketIndices = useMemo(() => {
-    const kospi = getIndexInfo('^KS11', gameDate)
-    const kosdaq = getIndexInfo('^KQ11', gameDate)
-    const usdkrw = getIndexInfo('KRW=X', gameDate)
+    const kospi = getIndexInfo('^KS11')
+    const kosdaq = getIndexInfo('^KQ11')
+    const usdkrw = getIndexInfo('KRW=X')
 
     return [
       {
         name: "KOSPI",
-        value: kospi ? fmtValue(kospi.value, 2) : "---",
+        value: kospi ? fmtValue(kospi.price, 2) : "---",
         change: kospi ? fmtChange(kospi.change, 2) : "---",
         changePct: kospi ? fmtPct(kospi.changePct) : "---",
         isUp: kospi?.isUp ?? true,
       },
       {
         name: "KOSDAQ",
-        value: kosdaq ? fmtValue(kosdaq.value, 2) : "---",
+        value: kosdaq ? fmtValue(kosdaq.price, 2) : "---",
         change: kosdaq ? fmtChange(kosdaq.change, 2) : "---",
         changePct: kosdaq ? fmtPct(kosdaq.changePct) : "---",
         isUp: kosdaq?.isUp ?? true,
       },
       {
         name: "USD/KRW",
-        value: usdkrw ? fmtValue(usdkrw.value, 1) : "---",
+        value: usdkrw ? fmtValue(usdkrw.price, 1) : "---",
         change: usdkrw ? fmtChange(usdkrw.change, 1) : "---",
         changePct: usdkrw ? fmtPct(usdkrw.changePct) : "---",
         isUp: usdkrw?.isUp ?? true,
       },
     ]
-  }, [gameDate, getIndexInfo])
+  }, [getIndexInfo])
 
-  // Only show ranked stocks (those with a rank) in the hot list, unless searching
   const rankedStocks = allStocks.filter((s) => STOCK_RANKS[s.ticker])
 
   const filteredStocks = (searchQuery ? allStocks : rankedStocks)
@@ -125,7 +116,6 @@ export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell, gameDate
       return rankA - rankB
     })
 
-  // 게임에 없는 한국 주식 (로컬 DB 검색, 즉각 반응)
   const gameTickers = new Set(allStocks.map((s) => s.ticker))
   const extraResults = searchQuery.trim().length >= 1
     ? searchStocks(searchQuery.trim(), 10).filter((r) => !gameTickers.has(r.ticker))
@@ -134,21 +124,15 @@ export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell, gameDate
   const [extraPrices, setExtraPrices] = useState<Map<string, ExtraPrice>>(new Map())
   const [priceLoading, setPriceLoading] = useState(false)
   const [leveragePrices, setLeveragePrices] = useState<Map<string, ExtraPrice>>(new Map())
-  const [leverageLoading, setLeverageLoading] = useState(false)
+  const [leverageLoading, setLeverageLoading] = useState(true)
 
-  const dateStr = useMemo(() => {
-    const y = gameDate.getFullYear()
-    const m = String(gameDate.getMonth() + 1).padStart(2, '0')
-    const d = String(gameDate.getDate()).padStart(2, '0')
-    return `${y}-${m}-${d}`
-  }, [gameDate])
-
+  // Fetch leverage ETF prices on mount
   useEffect(() => {
     setLeverageLoading(true)
     Promise.all(
       LEVERAGE_STOCKS.map(async (s) => {
         try {
-          const res = await fetch(`/api/stock-price?ticker=${s.ticker}&date=${dateStr}`)
+          const res = await fetch(`/api/price?symbol=${s.ticker}`)
           if (!res.ok) return [s.ticker, null] as const
           const data = await res.json()
           return [s.ticker, data as ExtraPrice] as const
@@ -160,16 +144,20 @@ export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell, gameDate
       setLeveragePrices(new Map(entries))
       setLeverageLoading(false)
     })
-  }, [dateStr])
+  }, [])
 
+  // Fetch prices for extra search results
   useEffect(() => {
     if (extraResults.length === 0) { setExtraPrices(new Map()); return }
     setPriceLoading(true)
     Promise.all(
       extraResults.map(async (r) => {
-        const yahooTicker = r.exchange === 'KOSPI' ? `${r.ticker}.KS` : r.exchange === 'KOSDAQ' ? `${r.ticker}.KQ` : r.ticker
+        const yahooTicker =
+          r.exchange === 'KOSPI' ? `${r.ticker}.KS`
+          : r.exchange === 'KOSDAQ' ? `${r.ticker}.KQ`
+          : r.ticker
         try {
-          const res = await fetch(`/api/stock-price?ticker=${yahooTicker}&date=${dateStr}`)
+          const res = await fetch(`/api/price?symbol=${yahooTicker}`)
           if (!res.ok) return [r.ticker, null] as const
           const data = await res.json()
           return [r.ticker, data as ExtraPrice] as const
@@ -182,7 +170,7 @@ export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell, gameDate
       setPriceLoading(false)
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, dateStr])
+  }, [searchQuery])
 
   function handleLeverageClick(s: typeof LEVERAGE_STOCKS[number]) {
     if (leverageLoading) return
@@ -190,18 +178,16 @@ export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell, gameDate
     const stock: Stock = {
       id: s.ticker.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0),
       ticker: s.ticker,
+      yahooTicker: s.ticker,
       name: s.name,
       nameKr: s.name,
       price: priceInfo?.price ?? 0,
       change: priceInfo?.change ?? 0,
       changePct: priceInfo?.changePct ?? 0,
       isUp: priceInfo?.isUp ?? true,
-      sparkData: Array(10).fill(priceInfo?.price ?? 0),
-      chartData: [],
+      sparkData: [],
       logoColor: tickerColor(s.ticker),
       initial: s.ticker.charAt(0),
-      high52w: priceInfo?.price ?? 0,
-      low52w: priceInfo?.price ?? 0,
       marketCap: "---",
       per: "---",
       pbr: "---",
@@ -213,22 +199,23 @@ export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell, gameDate
   function handleExtraResultClick(result: KoreanStock) {
     if (priceLoading) return
     const priceInfo = extraPrices.get(result.ticker)
-    const yahooTicker = result.exchange === "KOSPI" ? `${result.ticker}.KS` : result.exchange === "KOSDAQ" ? `${result.ticker}.KQ` : result.ticker
+    const yahooTicker =
+      result.exchange === "KOSPI" ? `${result.ticker}.KS`
+      : result.exchange === "KOSDAQ" ? `${result.ticker}.KQ`
+      : result.ticker
     const stock: Stock = {
       id: result.ticker.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0),
       ticker: result.ticker,
+      yahooTicker,
       name: result.name,
       nameKr: result.name,
       price: priceInfo?.price ?? 0,
       change: priceInfo?.change ?? 0,
       changePct: priceInfo?.changePct ?? 0,
       isUp: priceInfo?.isUp ?? true,
-      sparkData: Array(10).fill(priceInfo?.price ?? 0),
-      chartData: [],
+      sparkData: [],
       logoColor: tickerColor(result.ticker),
       initial: result.name.charAt(0),
-      high52w: priceInfo?.price ?? 0,
-      low52w: priceInfo?.price ?? 0,
       marketCap: "---",
       per: "---",
       pbr: "---",
@@ -282,35 +269,6 @@ export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell, gameDate
           </div>
         )}
 
-        {/* Theme Sectors */}
-        {/*{!searchQuery && (*/}
-        {/*  <div className="px-4 mb-5">*/}
-        {/*    <div className="flex items-center justify-between mb-3">*/}
-        {/*      <h2 className="text-base font-bold text-foreground">테마 섹터</h2>*/}
-        {/*      <button className="flex items-center gap-0.5 text-xs text-muted-foreground active:scale-95 transition-transform">*/}
-        {/*        전체보기 <ChevronRight className="w-3.5 h-3.5" />*/}
-        {/*      </button>*/}
-        {/*    </div>*/}
-        {/*    <div className="grid grid-cols-3 gap-2.5">*/}
-        {/*      {THEME_SECTORS.map((sector) => (*/}
-        {/*        <button*/}
-        {/*          key={sector.name}*/}
-        {/*          className="bg-card rounded-2xl card-shadow p-3.5 text-left active:scale-[0.97] transition-transform"*/}
-        {/*          aria-label={`${sector.name} sector`}*/}
-        {/*        >*/}
-        {/*          <div className={cn("inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-semibold mb-2", sector.color)}>*/}
-        {/*            {sector.name}*/}
-        {/*          </div>*/}
-        {/*          <p className="text-xs text-muted-foreground">{sector.count}개 종목</p>*/}
-        {/*          <p className={cn("text-sm font-bold mt-0.5", sector.isUp ? "stock-up" : "stock-down")}>*/}
-        {/*            {sector.change}*/}
-        {/*          </p>*/}
-        {/*        </button>*/}
-        {/*      ))}*/}
-        {/*    </div>*/}
-        {/*  </div>*/}
-        {/*)}*/}
-
         {/* Hot Stocks */}
         <div className="px-4 mb-4">
           <div className="flex items-center justify-between mb-3">
@@ -322,7 +280,6 @@ export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell, gameDate
                 {searchQuery ? "검색 결과" : "인기 종목"}
               </h2>
             </div>
-            {/* Tabs */}
             {!searchQuery && (
               <div className="flex gap-0.5 bg-secondary rounded-xl p-0.5">
                 {MARKET_TABS.map((tab) => (
@@ -363,44 +320,28 @@ export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell, gameDate
                     )}
                     aria-label={`${stock.nameKr} 매수/매도`}
                   >
-                    {/* Rank */}
                     <span className="text-xs font-bold text-muted-foreground w-4 text-center flex-shrink-0">
                       {rank ?? "-"}
                     </span>
-
-                    {/* Logo */}
-                    <div
-                      className={cn(
-                        "w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-xs flex-shrink-0",
-                        stock.logoColor
-                      )}
-                    >
+                    <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-xs flex-shrink-0", stock.logoColor)}>
                       {stock.initial}
                     </div>
-
-                    {/* Name */}
                     <div className="flex-1 min-w-0 text-left">
                       <div className="flex items-center gap-1.5">
                         <p className="text-sm font-semibold text-foreground truncate">{stock.nameKr}</p>
                         {isHeld && (
-                          <span className="text-[10px] font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded-md flex-shrink-0">
-                            보유중
-                          </span>
+                          <span className="text-[10px] font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded-md flex-shrink-0">보유중</span>
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground">{stock.ticker}</p>
                     </div>
-
-                    {/* Sparkline */}
                     <Sparkline data={stock.sparkData} width={56} height={28} isUp={stock.isUp} />
-
-                    {/* Price */}
                     <div className="text-right flex-shrink-0">
                       <p className="text-sm font-bold text-foreground">
-                        ₩{stock.price.toLocaleString()}
+                        {stock.price > 0 ? `₩${stock.price.toLocaleString()}` : '---'}
                       </p>
                       <p className={cn("text-xs font-semibold", stock.isUp ? "stock-up" : "stock-down")}>
-                        {stock.isUp ? "+" : ""}{stock.changePct.toFixed(2)}%
+                        {stock.price > 0 ? `${stock.isUp ? "+" : ""}${stock.changePct.toFixed(2)}%` : '---'}
                       </p>
                     </div>
                   </button>
@@ -410,7 +351,7 @@ export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell, gameDate
           </div>
         </div>
 
-        {/* ── 레버리지 ETF ── */}
+        {/* Leverage ETFs */}
         {!searchQuery && (
           <div className="px-4 mb-4">
             <div className="flex items-center gap-1.5 mb-3">
@@ -442,9 +383,7 @@ export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell, gameDate
                       <div className="flex items-center gap-1.5">
                         <p className="text-sm font-semibold text-foreground truncate">{s.name}</p>
                         {isHeld && (
-                          <span className="text-[10px] font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded-md flex-shrink-0">
-                            보유중
-                          </span>
+                          <span className="text-[10px] font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded-md flex-shrink-0">보유중</span>
                         )}
                       </div>
                       <div className="flex items-center gap-1.5 mt-0.5">
@@ -473,7 +412,7 @@ export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell, gameDate
           </div>
         )}
 
-        {/* ── 전체 종목 검색 결과 (게임 미지원 종목) ── */}
+        {/* Extra search results (global stocks) */}
         {searchQuery.trim().length >= 1 && extraResults.length > 0 && (
           <div className="px-4 mb-4">
             <div className="flex items-center gap-1.5 mb-3">
@@ -501,11 +440,9 @@ export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell, gameDate
                       <p className="text-xs text-muted-foreground">{result.ticker}</p>
                       <span className={cn(
                         "text-[9px] font-bold px-1 py-0.5 rounded",
-                        result.exchange === "KOSPI"
-                          ? "bg-blue-50 text-blue-600"
-                          : result.exchange === "KOSDAQ"
-                          ? "bg-green-50 text-green-600"
-                          : "bg-purple-50 text-purple-600"
+                        result.exchange === "KOSPI" ? "bg-blue-50 text-blue-600"
+                        : result.exchange === "KOSDAQ" ? "bg-green-50 text-green-600"
+                        : "bg-purple-50 text-purple-600"
                       )}>
                         {result.exchange}
                       </span>
@@ -533,41 +470,6 @@ export function DiscoverTab({ allStocks, holdings, cash, onBuy, onSell, gameDate
           </div>
         )}
 
-        {/* News / Market Digest */}
-        {/*{!searchQuery && (*/}
-        {/*  <div className="px-4 mb-4">*/}
-        {/*    <div className="flex items-center justify-between mb-3">*/}
-        {/*      <h2 className="text-base font-bold text-foreground">오늘의 시장</h2>*/}
-        {/*    </div>*/}
-        {/*    <div className="flex flex-col gap-2.5">*/}
-        {/*      {[*/}
-        {/*        { headline: "반도체 수출 전월 대비 18% 급증", time: "14분 전", tag: "반도체" },*/}
-        {/*        { headline: "미 연준, 금리 동결 시사 발언에 코스피 상승", time: "32분 전", tag: "거시경제" },*/}
-        {/*        { headline: "LG에너지솔루션, 북미 배터리 공장 증설 발표", time: "1시간 전", tag: "2차전지" },*/}
-        {/*      ].map((news, i) => (*/}
-        {/*        <button*/}
-        {/*          key={i}*/}
-        {/*          className="bg-card rounded-2xl card-shadow p-4 text-left active:scale-[0.98] transition-transform"*/}
-        {/*        >*/}
-        {/*          <div className="flex items-start justify-between gap-3">*/}
-        {/*            <div className="flex-1">*/}
-        {/*              <span className="text-xs text-primary font-semibold bg-primary/8 px-2 py-0.5 rounded-md">*/}
-        {/*                {news.tag}*/}
-        {/*              </span>*/}
-        {/*              <p className="text-sm font-semibold text-foreground mt-1.5 leading-snug text-balance">*/}
-        {/*                {news.headline}*/}
-        {/*              </p>*/}
-        {/*              <p className="text-xs text-muted-foreground mt-1">{news.time}</p>*/}
-        {/*            </div>*/}
-        {/*            <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-1" />*/}
-        {/*          </div>*/}
-        {/*        </button>*/}
-        {/*      ))}*/}
-        {/*    </div>*/}
-        {/*  </div>*/}
-        {/*)}*/}
-
-        {/* Bottom padding for tab bar */}
         <div className="h-6" />
       </div>
 
