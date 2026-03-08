@@ -1,12 +1,12 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { Eye, EyeOff, TrendingUp, TrendingDown } from "lucide-react"
+import { Eye, EyeOff, TrendingUp, TrendingDown, BarChart2, ArrowRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { StockDetailSheet } from "@/components/stock-detail-sheet"
 import type { Holding } from "@/lib/stocks"
 
-// ── useCountUp: eased integer animation ───────────────────
+// ── useCountUp ─────────────────────────────────────────────
 function useCountUp(target: number, duration = 260) {
   const [displayed, setDisplayed] = useState(target)
   const fromRef = useRef(target)
@@ -33,7 +33,7 @@ function useCountUp(target: number, duration = 260) {
   return displayed
 }
 
-// ── useSlide: slide-in direction on value change ──────────
+// ── useSlide ───────────────────────────────────────────────
 function useSlide(value: number) {
   const prevRef = useRef(value)
   const mountedRef = useRef(false)
@@ -51,52 +51,6 @@ function useSlide(value: number) {
   return { animKey, slideClass }
 }
 
-// ── SVG Sparkline ─────────────────────────────────────────
-function Sparkline({ data, isUp }: { data: number[]; isUp: boolean }) {
-  if (data.length < 2) return null
-
-  const H = 48
-  const W = 100
-  const min = Math.min(...data)
-  const max = Math.max(...data)
-  const range = max - min || 1
-  const pad = 4
-
-  const pts = data.map((v, i) => {
-    const x = (i / (data.length - 1)) * W
-    const y = H - pad - ((v - min) / range) * (H - pad * 2)
-    return [x, y] as [number, number]
-  })
-
-  const line = pts.map(([x, y], i) => `${i === 0 ? "M" : "L"} ${x} ${y}`).join(" ")
-  const fill = `${line} L ${W} ${H} L 0 ${H} Z`
-
-  const stroke = isUp ? "var(--stock-up)" : "var(--stock-down)"
-  const fillColor = isUp
-    ? "oklch(0.57 0.22 25 / 0.12)"
-    : "oklch(0.5 0.18 255 / 0.12)"
-
-  return (
-    <svg
-      viewBox={`0 0 ${W} ${H}`}
-      className="w-full"
-      preserveAspectRatio="none"
-      style={{ height: H }}
-    >
-      <path d={fill} fill={fillColor} />
-      <path
-        d={line}
-        fill="none"
-        stroke={stroke}
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        vectorEffect="non-scaling-stroke"
-      />
-    </svg>
-  )
-}
-
 // ── Types ──────────────────────────────────────────────────
 interface PortfolioTabProps {
   holdings: Holding[]
@@ -104,10 +58,11 @@ interface PortfolioTabProps {
   assetHistory?: number[]
   onBuy: (ticker: string, quantity: number, price: number) => void
   onSell: (ticker: string, quantity: number, price: number) => void
+  onDiscoverClick?: () => void
 }
 
 // ── Component ──────────────────────────────────────────────
-export function PortfolioTab({ holdings, cash, assetHistory, onBuy, onSell }: PortfolioTabProps) {
+export function PortfolioTab({ holdings, cash, assetHistory, onBuy, onSell, onDiscoverClick }: PortfolioTabProps) {
   const [hideBalance, setHideBalance] = useState(false)
   const [selectedStock, setSelectedStock] = useState<Holding | null>(null)
 
@@ -121,7 +76,6 @@ export function PortfolioTab({ holdings, cash, assetHistory, onBuy, onSell }: Po
   const todayGain = holdings.reduce((sum, h) => sum + h.change * h.shares, 0)
   const todayIsUp = todayGain >= 0
 
-  // Animated display values
   const animTotalValue = useCountUp(totalValue)
   const animStockValue = useCountUp(stockValue)
   const animTodayGain  = useCountUp(todayGain)
@@ -133,46 +87,40 @@ export function PortfolioTab({ holdings, cash, assetHistory, onBuy, onSell }: Po
   return (
     <>
       <div className="flex flex-col min-h-0">
-        {/* ── Header ────────────────────────────────────── */}
-        <header className="flex items-center justify-between px-5 pt-2 pb-4 bg-background">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
-              <span className="text-primary-foreground text-sm font-bold">J</span>
-            </div>
-            <div>
-              <p className="text-[11px] text-muted-foreground leading-none">내 계좌</p>
-              <p className="text-sm font-semibold text-foreground leading-tight mt-0.5">James Kim</p>
-            </div>
-          </div>
+
+        {/* ── Header ─────────────────────────────────────── */}
+        <header className="flex items-center justify-between px-5 pt-3 pb-4">
+          <h1 className="text-[24px] font-bold text-foreground leading-none">내 주식</h1>
+          <button
+            onClick={() => setHideBalance(!hideBalance)}
+            className="w-10 h-10 flex items-center justify-center rounded-full active:bg-secondary transition-colors"
+            aria-label={hideBalance ? "금액 표시" : "금액 숨기기"}
+          >
+            {hideBalance
+              ? <EyeOff className="w-[18px] h-[18px] text-muted-foreground" />
+              : <Eye    className="w-[18px] h-[18px] text-muted-foreground" />}
+          </button>
         </header>
 
-        {/* ── Top Summary Card ──────────────────────────── */}
-        <div className="mx-4 mb-4">
-          <div className="bg-card rounded-2xl card-shadow overflow-hidden">
-            <div className="px-5 pt-5 pb-4">
-              {/* Row: label + eye toggle */}
-              <div className="flex items-center justify-between mb-5">
-                <p className="text-[11px] text-muted-foreground font-medium tracking-wide uppercase">내 포트폴리오</p>
-                <button
-                  onClick={() => setHideBalance(!hideBalance)}
-                  className="text-muted-foreground active:scale-95 transition-transform"
-                  aria-label={hideBalance ? "금액 표시" : "금액 숨기기"}
-                >
-                  {hideBalance
-                    ? <EyeOff className="w-[15px] h-[15px]" />
-                    : <Eye className="w-[15px] h-[15px]" />}
-                </button>
-              </div>
+        {/* ── Summary Card ───────────────────────────────── */}
+        <div className="mx-5 mb-7">
+          <div
+            className="bg-card overflow-hidden"
+            style={{ borderRadius: 20, boxShadow: "0 2px 16px rgba(0,0,0,0.06)" }}
+          >
+            <div className="px-6 pt-6 pb-6">
 
-              {/* 수익률 — hero number (slide animation on change) */}
+              {/* 수익률 */}
+              <p style={{ color: "#888", fontSize: 12, fontWeight: 500, marginBottom: 6 }}>수익률</p>
               <div className="overflow-hidden">
                 <div
                   key={pctKey}
                   className={cn(
-                    "text-[42px] font-extrabold leading-none tracking-tight",
+                    "font-extrabold leading-none tracking-tight",
                     pctSlide,
                     hasHoldings ? (isTotalUp ? "stock-up" : "stock-down") : "text-muted-foreground"
                   )}
+                  style={{ fontSize: 48, fontWeight: 800 }}
                 >
                   {hideBalance
                     ? "•••%"
@@ -181,90 +129,126 @@ export function PortfolioTab({ holdings, cash, assetHistory, onBuy, onSell }: Po
                       : "0.00%"}
                 </div>
               </div>
-              <p className="text-[11px] text-muted-foreground mt-1.5 mb-5">수익률</p>
 
-              {/* 총 평가금액 (count-up) */}
-              <p className="text-[20px] font-bold text-foreground leading-none tracking-tight tabular-nums">
-                {hideBalance ? "•••••••" : `₩${animTotalValue.toLocaleString()}`}
-              </p>
-              <p className="text-[11px] text-muted-foreground mt-1.5 mb-4">총 평가금액</p>
+              {/* 총 평가금액 */}
+              <div style={{ marginTop: 20 }}>
+                <p style={{ color: "#888", fontSize: 12, fontWeight: 500, marginBottom: 6 }}>총 평가금액</p>
+                <p
+                  className="text-foreground leading-none tracking-tight tabular-nums"
+                  style={{ fontSize: 28, fontWeight: 600 }}
+                >
+                  {hideBalance ? "•••••••" : `₩${animTotalValue.toLocaleString()}`}
+                </p>
+              </div>
 
-              {/* Today's change pill (count-up) */}
-              <div className={cn(
-                "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full",
-                hasHoldings
-                  ? (todayIsUp ? "bg-stock-up-soft" : "bg-stock-down-soft")
-                  : "bg-secondary"
-              )}>
-                {hasHoldings && (
-                  todayIsUp
-                    ? <TrendingUp className="w-3 h-3 stock-up" strokeWidth={2.5} />
-                    : <TrendingDown className="w-3 h-3 stock-down" strokeWidth={2.5} />
-                )}
-                <span className={cn(
-                  "text-[11px] font-bold tabular-nums",
-                  hasHoldings ? (todayIsUp ? "stock-up" : "stock-down") : "text-muted-foreground"
-                )}>
-                  {hideBalance
-                    ? "•••"
-                    : hasHoldings
-                      ? `${todayIsUp ? "+" : ""}₩${animTodayGain.toLocaleString()}`
-                      : "₩0"}
-                </span>
-                <span className="text-[10px] text-muted-foreground">오늘</span>
+              {/* 오늘 손익 칩 */}
+              <div style={{ marginTop: 16 }}>
+                <div
+                  className={cn(
+                    "inline-flex items-center gap-1.5 px-3 py-1.5",
+                    hasHoldings
+                      ? (todayIsUp ? "bg-stock-up-soft" : "bg-stock-down-soft")
+                      : ""
+                  )}
+                  style={{
+                    borderRadius: 999,
+                    backgroundColor: hasHoldings ? undefined : "#F5F5F5",
+                  }}
+                >
+                  {hasHoldings && (
+                    todayIsUp
+                      ? <TrendingUp  className="w-3 h-3 stock-up"   strokeWidth={2.5} />
+                      : <TrendingDown className="w-3 h-3 stock-down" strokeWidth={2.5} />
+                  )}
+                  <span
+                    className={cn(
+                      "tabular-nums",
+                      hasHoldings ? (todayIsUp ? "stock-up" : "stock-down") : "text-muted-foreground"
+                    )}
+                    style={{ fontSize: 12, fontWeight: 700 }}
+                  >
+                    {hideBalance
+                      ? "•••"
+                      : hasHoldings
+                        ? `${todayIsUp ? "+" : ""}₩${animTodayGain.toLocaleString()}`
+                        : "₩0"}
+                  </span>
+                  <span style={{ fontSize: 12, color: "#888" }}>오늘</span>
+                </div>
               </div>
 
               {/* 3-stat row: 예수금 / 투자금 / 평가금액 */}
-              <div className="flex mt-5 pt-4 border-t border-border">
+              <div className="flex" style={{ marginTop: 24 }}>
                 <div className="flex-1">
-                  <p className="text-[10px] text-muted-foreground mb-1.5">예수금</p>
-                  <p className="text-[13px] font-bold text-foreground tabular-nums">
+                  <p style={{ color: "#888", fontSize: 12, fontWeight: 500, marginBottom: 6 }}>예수금</p>
+                  <p className="text-foreground tabular-nums" style={{ fontSize: 16, fontWeight: 600 }}>
                     {mask(`₩${cash.toLocaleString()}`)}
                   </p>
                 </div>
-                <div className="w-px bg-border self-stretch mx-3" />
                 <div className="flex-1">
-                  <p className="text-[10px] text-muted-foreground mb-1.5">투자금</p>
-                  <p className="text-[13px] font-bold text-foreground tabular-nums">
+                  <p style={{ color: "#888", fontSize: 12, fontWeight: 500, marginBottom: 6 }}>투자금</p>
+                  <p className="text-foreground tabular-nums" style={{ fontSize: 16, fontWeight: 600 }}>
                     {mask(`₩${totalInvested.toLocaleString()}`)}
                   </p>
                 </div>
-                <div className="w-px bg-border self-stretch mx-3" />
                 <div className="flex-1">
-                  <p className="text-[10px] text-muted-foreground mb-1.5">평가금액</p>
-                  <p className={cn(
-                    "text-[13px] font-bold tabular-nums",
-                    hasHoldings ? (isTotalUp ? "stock-up" : "stock-down") : "text-foreground"
-                  )}>
+                  <p style={{ color: "#888", fontSize: 12, fontWeight: 500, marginBottom: 6 }}>평가금액</p>
+                  <p
+                    className={cn(
+                      "tabular-nums",
+                      hasHoldings ? (isTotalUp ? "stock-up" : "stock-down") : "text-foreground"
+                    )}
+                    style={{ fontSize: 16, fontWeight: 600 }}
+                  >
                     {mask(`₩${animStockValue.toLocaleString()}`)}
                   </p>
                 </div>
               </div>
             </div>
-
-            {/* Sparkline — full-width, flush to card bottom */}
-            {assetHistory && assetHistory.length >= 2 && (
-              <div className="px-0 pb-0">
-                <Sparkline data={assetHistory} isUp={isTotalUp} />
-              </div>
-            )}
           </div>
         </div>
 
-        {/* ── Holdings List ─────────────────────────────── */}
-        <div className="px-4 mb-4">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-[15px] font-bold text-foreground">보유 종목</h2>
-            <span className="text-xs text-muted-foreground">{holdings.length}개 종목</span>
+        {/* ── Holdings Section ───────────────────────────── */}
+        <div className="px-5 mb-4">
+          <div className="flex items-center justify-between mb-4">
+            <h2 style={{ fontSize: 18, fontWeight: 700 }} className="text-foreground">보유 종목</h2>
+            <span style={{ fontSize: 14, color: "#aaaaaa" }}>{holdings.length}개 종목</span>
           </div>
 
           {holdings.length === 0 ? (
-            <div className="bg-card rounded-2xl card-shadow py-12 text-center">
-              <p className="text-muted-foreground text-sm">보유 종목이 없습니다</p>
-              <p className="text-muted-foreground text-xs mt-1">탐색 탭에서 주식을 매수해보세요</p>
+            /* ── Empty State ── */
+            <div
+              className="bg-card flex flex-col items-center justify-center text-center py-9 px-6"
+              style={{ borderRadius: 20, boxShadow: "0 2px 16px rgba(0,0,0,0.06)" }}
+            >
+              <div
+                className="flex items-center justify-center mb-4"
+                style={{
+                  width: 52, height: 52, borderRadius: 16,
+                  backgroundColor: "#F5F5F5",
+                }}
+              >
+                <BarChart2 className="w-6 h-6 text-muted-foreground" strokeWidth={1.8} />
+              </div>
+              <p className="text-foreground font-semibold" style={{ fontSize: 15 }}>
+                보유 종목이 없어요
+              </p>
+              <p style={{ fontSize: 13, color: "#aaa", marginTop: 6, lineHeight: 1.5 }}>
+                탐색 탭에서 마음에 드는<br />종목을 찾아보세요
+              </p>
+              {onDiscoverClick && (
+                <button
+                  onClick={onDiscoverClick}
+                  className="flex items-center gap-1 active:opacity-60 transition-opacity"
+                  style={{ marginTop: 20, fontSize: 13, fontWeight: 600, color: "var(--primary)" }}
+                >
+                  종목 탐색하기
+                  <ArrowRight className="w-3.5 h-3.5" strokeWidth={2.5} />
+                </button>
+              )}
             </div>
           ) : (
-            <div className="flex flex-col gap-2.5">
+            <div className="flex flex-col gap-3">
               {holdings.map((stock) => {
                 const currentValue = stock.price * stock.shares
                 const invested = stock.avgPrice * stock.shares
@@ -276,59 +260,73 @@ export function PortfolioTab({ holdings, cash, assetHistory, onBuy, onSell }: Po
                   <button
                     key={stock.id}
                     onClick={() => setSelectedStock(stock)}
-                    className="bg-card rounded-2xl card-shadow p-4 w-full text-left active:scale-[0.98] transition-transform"
+                    className="bg-card w-full text-left active:scale-[0.98] transition-transform"
+                    style={{ borderRadius: 20, boxShadow: "0 2px 16px rgba(0,0,0,0.06)", padding: 20 }}
                     aria-label={`${stock.nameKr} 상세 보기`}
                   >
-                    {/* Row 1: name + current price */}
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <p className="text-[14px] font-bold text-foreground truncate">{stock.nameKr}</p>
-                          <p className="text-[14px] font-bold text-foreground tabular-nums">
-                            ₩{stock.price.toLocaleString()}
-                          </p>
-                        </div>
-                        <div className="flex items-center justify-between mt-0.5">
-                          <p className="text-xs text-muted-foreground">{stock.ticker}</p>
-                          <span className={cn("text-xs font-semibold", stock.isUp ? "stock-up" : "stock-down")}>
-                            {stock.isUp ? "+" : ""}{stock.changePct.toFixed(2)}%
-                          </span>
-                        </div>
+                    {/* Row 1: name + price */}
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-foreground font-bold truncate" style={{ fontSize: 15 }}>
+                          {stock.nameKr}
+                        </p>
+                        <p style={{ fontSize: 12, color: "#aaa", marginTop: 3 }}>{stock.ticker}</p>
+                      </div>
+                      <div className="text-right flex-shrink-0 ml-3">
+                        <p className="text-foreground font-bold tabular-nums" style={{ fontSize: 15 }}>
+                          ₩{stock.price.toLocaleString()}
+                        </p>
+                        <p
+                          className={cn("tabular-nums font-semibold", stock.isUp ? "stock-up" : "stock-down")}
+                          style={{ fontSize: 12, marginTop: 3 }}
+                        >
+                          {stock.isUp ? "+" : ""}{stock.changePct.toFixed(2)}%
+                        </p>
                       </div>
                     </div>
 
-                    {/* Row 2: detail fields + return % badge */}
+                    {/* Row 2: detail grid + return badge */}
                     <div className="flex items-end gap-3">
-                      <div className="flex-1 grid grid-cols-2 gap-x-4 gap-y-2">
+                      <div className="flex-1 grid grid-cols-2 gap-x-4 gap-y-3">
                         <div>
-                          <p className="text-[10px] text-muted-foreground">보유 수량</p>
-                          <p className="text-xs font-semibold text-foreground mt-0.5">{stock.shares}주</p>
+                          <p style={{ fontSize: 11, color: "#aaa", marginBottom: 3 }}>보유 수량</p>
+                          <p className="text-foreground font-semibold" style={{ fontSize: 13 }}>
+                            {stock.shares}주
+                          </p>
                         </div>
                         <div>
-                          <p className="text-[10px] text-muted-foreground">평균 매수가</p>
-                          <p className="text-xs font-semibold text-foreground mt-0.5 tabular-nums">₩{stock.avgPrice.toLocaleString()}</p>
+                          <p style={{ fontSize: 11, color: "#aaa", marginBottom: 3 }}>평균 매수가</p>
+                          <p className="text-foreground font-semibold tabular-nums" style={{ fontSize: 13 }}>
+                            ₩{stock.avgPrice.toLocaleString()}
+                          </p>
                         </div>
                         <div>
-                          <p className="text-[10px] text-muted-foreground">평가금액</p>
-                          <p className="text-xs font-semibold text-foreground mt-0.5 tabular-nums">₩{currentValue.toLocaleString()}</p>
+                          <p style={{ fontSize: 11, color: "#aaa", marginBottom: 3 }}>평가금액</p>
+                          <p className="text-foreground font-semibold tabular-nums" style={{ fontSize: 13 }}>
+                            ₩{currentValue.toLocaleString()}
+                          </p>
                         </div>
                         <div>
-                          <p className="text-[10px] text-muted-foreground">손익</p>
-                          <p className={cn("text-xs font-bold mt-0.5 tabular-nums", isProfit ? "stock-up" : "stock-down")}>
+                          <p style={{ fontSize: 11, color: "#aaa", marginBottom: 3 }}>손익</p>
+                          <p
+                            className={cn("font-bold tabular-nums", isProfit ? "stock-up" : "stock-down")}
+                            style={{ fontSize: 13 }}
+                          >
                             {isProfit ? "+" : ""}₩{gain.toLocaleString()}
                           </p>
                         </div>
                       </div>
 
                       {/* Return % badge */}
-                      <div className="flex-shrink-0">
-                        <span className={cn(
-                          "text-xs font-bold px-2.5 py-1 rounded-xl tabular-nums",
+                      <span
+                        className={cn(
+                          "flex-shrink-0 font-bold tabular-nums px-3 py-1.5",
                           isProfit ? "bg-stock-up-soft stock-up" : "bg-stock-down-soft stock-down"
-                        )}>
-                          {isProfit ? "+" : ""}{gainPct.toFixed(2)}%
-                        </span>
-                      </div>
+                        )}
+                        style={{ borderRadius: 12, fontSize: 13 }}
+                      >
+                        {isProfit ? "+" : ""}{gainPct.toFixed(2)}%
+                      </span>
                     </div>
                   </button>
                 )

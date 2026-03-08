@@ -154,6 +154,7 @@ export default function StockApp() {
                 cash={cash}
                 onBuy={handleBuy}
                 onSell={handleSell}
+                onDiscoverClick={() => setActiveTab("discover")}
               />
             )}
           </div>

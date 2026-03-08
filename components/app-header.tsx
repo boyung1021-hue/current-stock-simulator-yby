@@ -30,36 +30,40 @@ export function AppHeader({ loading, lastUpdated, onRefresh }: AppHeaderProps) {
   return (
     <div className="fixed top-0 left-0 right-0 z-40 flex justify-center pointer-events-none">
       <div className="w-full max-w-sm bg-background/95 backdrop-blur-sm border-b border-border pointer-events-auto">
-        <div className="px-5 pt-12 pb-4">
-          {/* Date row */}
+        <div className="px-5 pt-12 pb-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-baseline gap-2">
-              <p className="text-xl font-bold text-foreground">
-                {year}년 {month}월 {day}일
+            {/* Date */}
+            <div>
+              <div className="flex items-baseline gap-1.5">
+                <p className="text-[17px] font-bold text-foreground">
+                  {year}년 {month}월 {day}일
+                </p>
+                <span className="text-[13px] font-medium text-muted-foreground">({weekday})</span>
+              </div>
+              {/* Last updated */}
+              <p style={{ fontSize: 12, color: '#aaaaaa', marginTop: 3 }}>
+                {loading
+                  ? '가격 불러오는 중...'
+                  : lastUpdated
+                  ? `마지막 업데이트: ${formatTime(lastUpdated)}`
+                  : '업데이트 대기 중'}
               </p>
-              <span className="text-sm font-medium text-muted-foreground">({weekday})</span>
             </div>
 
-            {/* Refresh button */}
+            {/* Refresh icon button — icon only, generous touch area */}
             <button
               onClick={onRefresh}
               disabled={loading}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-secondary text-muted-foreground text-xs font-medium active:scale-95 transition-all disabled:opacity-50"
+              className="flex items-center justify-center w-11 h-11 rounded-full active:bg-secondary transition-colors disabled:opacity-40"
               aria-label="가격 새로고침"
             >
-              <RefreshCw className={cn('w-3 h-3', loading && 'animate-spin')} strokeWidth={2.5} />
-              새로고침
+              <RefreshCw
+                className={cn('text-muted-foreground', loading && 'animate-spin')}
+                style={{ width: 20, height: 20 }}
+                strokeWidth={2}
+              />
             </button>
           </div>
-
-          {/* Last updated */}
-          <p className="text-xs text-muted-foreground mt-1.5">
-            {loading
-              ? '가격 불러오는 중...'
-              : lastUpdated
-              ? `마지막 업데이트: ${formatTime(lastUpdated)}`
-              : '업데이트 대기 중'}
-          </p>
         </div>
       </div>
     </div>
