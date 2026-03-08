@@ -1,23 +1,28 @@
 "use client"
 
 import { cn } from "@/lib/utils"
-import { PieChart, Compass } from "lucide-react"
+import { PieChart, Compass, Trophy } from "lucide-react"
 
 interface BottomNavProps {
-  activeTab: "portfolio" | "discover"
-  onTabChange: (tab: "portfolio" | "discover") => void
+  activeTab: "portfolio" | "discover" | "ranking"
+  onTabChange: (tab: "portfolio" | "discover" | "ranking") => void
 }
 
 const TABS = [
   {
     id: "portfolio" as const,
-    labelKr: "내 포트폴리오",
+    labelKr: "포트폴리오",
     icon: PieChart,
   },
   {
     id: "discover" as const,
     labelKr: "탐색",
     icon: Compass,
+  },
+  {
+    id: "ranking" as const,
+    labelKr: "랭킹",
+    icon: Trophy,
   },
 ]
 

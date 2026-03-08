@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from "react"
 import { BottomNav } from "@/components/bottom-nav"
 import { PortfolioTab } from "@/components/portfolio-tab"
 import { DiscoverTab } from "@/components/discover-tab"
+import { RankingTab } from "@/components/ranking-tab"
 import { AppHeader } from "@/components/app-header"
 import { cn } from "@/lib/utils"
 import { ALL_STOCKS, INITIAL_CASH, type Holding, type Stock } from "@/lib/stocks"
@@ -33,7 +34,7 @@ function savePortfolio(holdings: Holding[], cash: number) {
 }
 
 export default function StockApp() {
-  const [activeTab, setActiveTab] = useState<"portfolio" | "discover">("portfolio")
+  const [activeTab, setActiveTab] = useState<"portfolio" | "discover" | "ranking">("portfolio")
   const [holdings, setHoldings] = useState<Holding[]>([])
   const [cash, setCash] = useState(INITIAL_CASH)
   const [extraStocks, setExtraStocks] = useState<Stock[]>([])
@@ -177,6 +178,18 @@ export default function StockApp() {
                 onAddExtraStock={handleAddExtraStock}
               />
             )}
+          </div>
+
+          <div
+            className={cn(
+              "transition-all duration-300",
+              activeTab === "ranking"
+                ? "opacity-100 translate-y-0"
+                : "opacity-0 translate-y-2 pointer-events-none absolute inset-0"
+            )}
+            aria-hidden={activeTab !== "ranking"}
+          >
+            {activeTab === "ranking" && <RankingTab />}
           </div>
         </div>
 
